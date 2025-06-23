@@ -1,11 +1,14 @@
 {
   "name": "whatsapp-bot-modern",
-  "version": "1.0.0",
-  "description": "Bot WhatsApp moderne avec Voice FX, Stickers et Quiz",
+  "version": "1.1.0",
+  "description": "Bot WhatsApp moderne avec Voice FX, Stickers, Quiz et Text-to-Speech",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js",
-    "dev": "nodemon bot.js"
+    "dev": "nodemon bot.js",
+    "install-deps": "npm install",
+    "setup-tts": "echo 'Pour installer espeak-ng: sudo apt-get install espeak-ng (Ubuntu/Debian) ou sudo yum install espeak-ng (CentOS/RHEL)'",
+    "test": "node -e \"console.log('✅ Test de démarrage...'); require('./bot.js');\""
   },
   "dependencies": {
     "whatsapp-web.js": "^1.23.0",
@@ -14,22 +17,64 @@
     "formidable": "^3.5.1",
     "fluent-ffmpeg": "^2.1.2",
     "ffmpeg-static": "^5.2.0",
-    "sharp": "^0.32.6"
+    "sharp": "^0.32.6",
+    "node-gtts": "^2.0.2",
+    "microsoft-cognitiveservices-speech-sdk": "^1.34.1",
+    "say": "^0.16.0",
+    "festival-tts": "^1.0.3"
+  },
+  "optionalDependencies": {
+    "espeak-tts": "^1.0.2",
+    "pico-tts": "^1.0.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "nodemon": "^3.0.1",
+    "@types/node": "^20.8.0",
+    "eslint": "^8.50.0",
+    "prettier": "^3.0.3"
   },
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
   },
+  "os": [
+    "linux",
+    "darwin",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
   "keywords": [
     "whatsapp",
     "bot",
     "voice-fx",
     "stickers",
     "quiz",
-    "nodejs"
+    "text-to-speech",
+    "tts",
+    "voice-cloning",
+    "audio-processing",
+    "nodejs",
+    "ai-assistant"
   ],
-  "author": "WhatsApp Bot Developer",
-  "license": "MIT"
+  "author": {
+    "name": "WhatsApp Bot Developer",
+    "email": "developer@whatsappbot.com",
+    "url": "https://github.com/whatsapp-bot-modern"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/whatsapp-bot-modern/bot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/whatsapp-bot-modern/bot/issues"
+  },
+  "homepage": "https://github.com/whatsapp-bot-modern/bot#readme",
+  "funding": {
+    "type": "individual",
+    "url": "https://github.com/sponsors/whatsapp-bot-developer"
+  }
 }
