@@ -2,7 +2,7 @@
   "name": "whatsapp-bot-modern",
   "version": "1.0.0",
   "description": "Bot WhatsApp moderne avec Voice FX, Stickers, Quiz et Text-to-Speech",
-  "main": "bot.js",
+  "main": "bot.js", 
   "scripts": {
     "start": "node bot.js",
     "dev": "nodemon bot.js",
