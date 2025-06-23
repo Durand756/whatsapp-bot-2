@@ -8,6 +8,7 @@ const ffmpegStatic = require('ffmpeg-static');
 const sharp = require('sharp');
 const { exec } = require('child_process');
 const { promisify } = require('util');
+const ffmpeg = require('fluent-ffmpeg');
 
 // Configuration
 ffmpeg.setFfmpegPath(ffmpegStatic);
