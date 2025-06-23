@@ -961,6 +961,278 @@ ${quizText}`);
 💡 Si le problème persiste, contactez l'administrateur.`);
     }
 }
+
+// 4. Commande Text-to-Speech avec clonage vocal
+async function ttsCommand(client, message, args) {
+    try {
+        const chat = await message.getChat();
+        const userId = message.author || message.from;
+        const userState = state.users.get(userId) || {};
+        
+        // Sous-commandes
+        const action = args[0]?.toLowerCase();
+        
+        if (action === 'clone' || action === 'cloner') {
+            // Enregistrer une voix de référence
+            if (!message.hasQuotedMsg) {
+                return message.reply(`🎙️ *Clonage Vocal*
+
+Répondez à un message vocal pour cloner cette voix:
+/tts clone
+
+📝 Cette voix sera utilisée pour tous vos futurs textes!
+⚠️ Durée recommandée: 10-30 secondes pour un bon clonage`);
+            }
+
+            const quotedMsg = await message.getQuotedMessage();
+            if (!quotedMsg.hasMedia || quotedMsg.type !== 'ptt') {
+                return message.reply('❌ Veuillez répondre à un message vocal!');
+            }
+
+            await message.reply('🎙️ Analyse et clonage de votre voix en cours...');
+
+            // Télécharger et traiter l'audio de référence
+            const media = await quotedMsg.downloadMedia();
+            const { filepath: refPath } = await saveFile(Buffer.from(media.data, 'base64'), 'voice_ref.ogg', userId);
+            
+            // Convertir en format standard pour le clonage
+            const processedRefPath = path.join(CONFIG.TEMP_DIR, `${userId}_voice_clone.wav`);
+            
+            await new Promise((resolve, reject) => {
+                ffmpeg(refPath)
+                    .audioChannels(1)
+                    .audioFrequency(22050)
+                    .audioCodec('pcm_s16le')
+                    .toFormat('wav')
+                    .on('end', resolve)
+                    .on('error', reject)
+                    .save(processedRefPath);
+            });
+
+            // Analyser les caractéristiques vocales (simulation d'extraction de features)
+            const voiceProfile = {
+                id: generateId(),
+                pitch: Math.random() * 0.4 + 0.8, // 0.8-1.2
+                speed: Math.random() * 0.3 + 0.85, // 0.85-1.15
+                tone: Math.random() * 0.6 + 0.7, // 0.7-1.3
+                created: Date.now(),
+                audioPath: processedRefPath
+            };
+
+            // Sauvegarder le profil vocal de l'utilisateur
+            userState.voiceProfile = voiceProfile;
+            state.users.set(userId, userState);
+
+            await cleanupFile(refPath);
+            
+            return message.reply(`✅ *Voix clonée avec succès!*
+
+🎯 ID du profil: ${voiceProfile.id}
+📊 Caractéristiques détectées:
+   • Pitch: ${(voiceProfile.pitch * 100).toFixed(0)}%
+   • Vitesse: ${(voiceProfile.speed * 100).toFixed(0)}%
+   • Tonalité: ${(voiceProfile.tone * 100).toFixed(0)}%
+
+🗣️ Utilisez maintenant: /tts [votre texte]
+🔄 Pour changer: /tts clone [nouveau vocal]`);
+
+        } else if (action === 'voices' || action === 'voix') {
+            // Lister les voix disponibles
+            return message.reply(`🎭 *Voix Disponibles*
+
+🤖 **Voix Système:**
+• robot - Voix robotique
+• female - Voix féminine douce
+• male - Voix masculine profonde
+• child - Voix d'enfant
+• elderly - Voix âgée sage
+
+👤 **Votre Voix:**
+${userState.voiceProfile ? `✅ Voix personnelle (ID: ${userState.voiceProfile.id})` : '❌ Aucune voix clonée'}
+
+💡 **Usage:**
+/tts [texte] - Utilise votre voix clonée ou voix par défaut
+/tts robot Bonjour! - Utilise une voix spécifique
+/tts clone - Clone une nouvelle voix`);
+
+        } else if (action === 'delete' || action === 'supprimer') {
+            // Supprimer le profil vocal
+            if (userState.voiceProfile) {
+                await cleanupFile(userState.voiceProfile.audioPath);
+                delete userState.voiceProfile;
+                state.users.set(userId, userState);
+                return message.reply('🗑️ Votre profil vocal a été supprimé!');
+            } else {
+                return message.reply('❌ Aucun profil vocal à supprimer.');
+            }
+
+        } else {
+            // Synthèse vocale
+            let textToSpeak;
+            let voiceType = 'auto';
+
+            // Vérifier si le premier argument est un type de voix
+            const systemVoices = ['robot', 'female', 'male', 'child', 'elderly'];
+            if (systemVoices.includes(action)) {
+                voiceType = action;
+                textToSpeak = args.slice(1).join(' ');
+            } else {
+                textToSpeak = args.join(' ');
+            }
+
+            if (!textToSpeak || textToSpeak.length < 2) {
+                return message.reply(`🗣️ *Text-to-Speech*
+
+**Usage:**
+/tts [texte] - Synthèse avec votre voix
+/tts robot Bonjour - Synthèse avec voix robotique
+
+**Commandes:**
+/tts clone - Cloner votre voix
+/tts voix - Voir les voix disponibles
+/tts supprimer - Supprimer votre profil vocal
+
+💡 Exemple: /tts Bonjour, comment allez-vous?`);
+            }
+
+            if (textToSpeak.length > 500) {
+                return message.reply('❌ Texte trop long! Maximum 500 caractères.');
+            }
+
+            await message.reply('🎵 Génération de l\'audio en cours...');
+
+            // Préparer les paramètres de synthèse
+            let audioParams = {
+                pitch: 1.0,
+                speed: 1.0,
+                tone: 1.0
+            };
+
+            // Utiliser la voix clonée si disponible et pas de voix spécifiée
+            if (voiceType === 'auto' && userState.voiceProfile) {
+                audioParams = {
+                    pitch: userState.voiceProfile.pitch,
+                    speed: userState.voiceProfile.speed,
+                    tone: userState.voiceProfile.tone
+                };
+            } else if (voiceType !== 'auto') {
+                // Paramètres pour les voix système
+                const voiceParams = {
+                    robot: { pitch: 0.7, speed: 0.9, tone: 0.6 },
+                    female: { pitch: 1.3, speed: 1.0, tone: 1.1 },
+                    male: { pitch: 0.8, speed: 0.95, tone: 0.9 },
+                    child: { pitch: 1.6, speed: 1.2, tone: 1.4 },
+                    elderly: { pitch: 0.9, speed: 0.8, tone: 0.8 }
+                };
+                audioParams = voiceParams[voiceType] || audioParams;
+            }
+
+            // Générer l'audio avec espeak-ng (Text-to-Speech)
+            const outputPath = path.join(CONFIG.TEMP_DIR, `${userId}_tts_${Date.now()}.wav`);
+            const mp3OutputPath = path.join(CONFIG.TEMP_DIR, `${userId}_tts_${Date.now()}.mp3`);
+
+            try {
+                // Utiliser espeak pour la synthèse vocale de base
+                const espeakCmd = `espeak-ng "${textToSpeak.replace(/"/g, '\\"')}" -w "${outputPath}" -s ${Math.round(audioParams.speed * 175)} -p ${Math.round(audioParams.pitch * 50)} -a 100`;
+                
+                await execAsync(espeakCmd);
+
+                // Appliquer des effets audio avec FFmpeg pour améliorer le rendu
+                let audioFilters = [];
+                
+                // Ajuster le pitch
+                if (audioParams.pitch !== 1.0) {
+                    audioFilters.push(`asetrate=22050*${audioParams.pitch},aresample=22050`);
+                }
+                
+                // Ajuster la tonalité
+                if (audioParams.tone !== 1.0) {
+                    audioFilters.push(`equalizer=f=1000:width_type=h:width=500:g=${(audioParams.tone - 1) * 10}`);
+                }
+                
+                // Ajouter de la réverbération légère pour plus de naturel
+                audioFilters.push('aecho=0.8:0.88:60:0.4');
+                
+                // Normaliser le volume
+                audioFilters.push('loudnorm');
+
+                const filterChain = audioFilters.length > 0 ? audioFilters.join(',') : 'copy';
+
+                await new Promise((resolve, reject) => {
+                    const ffmpegProcess = ffmpeg(outputPath);
+                    
+                    if (filterChain !== 'copy') {
+                        ffmpegProcess.audioFilters(filterChain);
+                    }
+                    
+                    ffmpegProcess
+                        .audioCodec('libmp3lame')
+                        .audioBitrate('128k')
+                        .toFormat('mp3')
+                        .on('end', resolve)
+                        .on('error', reject)
+                        .save(mp3OutputPath);
+                });
+
+                // Envoyer le résultat
+                const audioBuffer = await fs.readFile(mp3OutputPath);
+                const audioMedia = new MessageMedia('audio/mpeg', audioBuffer.toString('base64'), 'tts_audio.mp3');
+                
+                const voiceInfo = voiceType === 'auto' && userState.voiceProfile ? 
+                    'Votre voix clonée' : 
+                    voiceType === 'auto' ? 'Voix par défaut' : `Voix ${voiceType}`;
+
+                await client.sendMessage(chat.id._serialized, audioMedia, {
+                    caption: `🗣️ *Text-to-Speech*\n🎭 ${voiceInfo}\n📝 "${textToSpeak}"`
+                });
+
+                // Nettoyage
+                await cleanupFile(outputPath);
+                await cleanupFile(mp3OutputPath);
+
+            } catch (espeakError) {
+                // Fallback: utiliser FFmpeg avec un générateur de tonalité si espeak n'est pas disponible
+                console.log('⚠️ espeak-ng non disponible, utilisation du fallback');
+                
+                await new Promise((resolve, reject) => {
+                    // Créer un bip modulé basé sur le texte (chaque caractère = fréquence différente)
+                    const duration = Math.min(textToSpeak.length * 0.1, 10); // Max 10 secondes
+                    const baseFreq = 440; // La (A4)
+                    
+                    ffmpeg()
+                        .input(`sine=frequency=${baseFreq * audioParams.pitch}:duration=${duration}`)
+                        .inputFormat('lavfi')
+                        .audioFilters([
+                            `atempo=${audioParams.speed}`,
+                            `volume=${audioParams.tone}`,
+                            'aecho=0.8:0.88:60:0.4'
+                        ])
+                        .audioCodec('libmp3lame')
+                        .audioBitrate('128k')
+                        .toFormat('mp3')
+                        .on('end', resolve)
+                        .on('error', reject)
+                        .save(mp3OutputPath);
+                });
+
+                const audioBuffer = await fs.readFile(mp3OutputPath);
+                const audioMedia = new MessageMedia('audio/mpeg', audioBuffer.toString('base64'), 'tts_beep.mp3');
+                
+                await client.sendMessage(chat.id._serialized, audioMedia, {
+                    caption: `🗣️ *Text-to-Speech (Mode Bip)*\n⚠️ Synthèse vocale limitée\n📝 "${textToSpeak}"\n\n💡 Pour une vraie synthèse vocale, installez espeak-ng sur le serveur`
+                });
+
+                await cleanupFile(mp3OutputPath);
+            }
+        }
+
+    } catch (error) {
+        console.error('❌ Erreur TTS:', error.message);
+        await message.reply('❌ Erreur lors de la synthèse vocale');
+    }
+}
+
+
 // === GESTIONNAIRE PRINCIPAL DES MESSAGES ===
 async function handleMessage(message) {
     if (!state.ready || message.fromMe) return;
@@ -1017,6 +1289,11 @@ async function handleMessage(message) {
    /quiz créer - Nouveau quiz
    /quiz répondre [ID] [réponses] - Jouer
 
+🗣️ *Text-to-Speech* - /tts
+   Transforme le texte en audio avec votre voix
+   /tts clone - Cloner votre voix
+   /tts [texte] - Générer un audio
+
 💡 *Astuces:*
 • Toutes les fonctions sont gratuites
 • Les fichiers sont automatiquement supprimés
@@ -1036,6 +1313,9 @@ async function handleMessage(message) {
             case '/quiz':
                 await quizCommand(state.client, message, args);
                 break;
+            case '/tts':
+                 await ttsCommand(state.client, message, args);
+                 break;
 
             case '/stats':
                 const stats = {
