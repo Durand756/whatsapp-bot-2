@@ -313,230 +313,274 @@ ${availableEffects}
     }
 }
 
-// 2. Commande Stickers Améliorée
+// Fonction sticker améliorée avec signature personnalisée
 async function stickerCommand(client, message, args) {
     try {
         const chat = await message.getChat();
         const userId = message.author || message.from;
-        const signature = args.join(' ') || 'S'; // Signature par défaut "S"
-
-        if (!message.hasQuotedMsg && !message.hasMedia) {
-            return message.reply(`🎨 *Créateur de Stickers*
-
-📱 *Comment utiliser:*
-• Envoyez une image/vidéo puis tapez: /sticker [signature]
-• Ou répondez à une image/vidéo avec: /sticker [signature]
-
-✨ *Exemples:*
-• /sticker → Signature: "S"
-• /sticker MonNom → Signature: "MonNom"
-• /sticker @MonCompte → Signature: "@MonCompte"
-
-📋 *Formats supportés:*
-• Images: JPG, PNG, WEBP
-• Vidéos: MP4, MOV, AVI, WEBM (max 10 sec)
-
-💡 *Astuce:* Les vidéos deviennent des stickers animés!`);
+        const contact = await message.getContact();
+        
+        // Signature personnalisée (par défaut "S." si rien n'est fourni)
+        let signature = args.join(' ').trim();
+        if (!signature) {
+            signature = 'S.';
+        }
+        
+        // Vérifier si minimum 1 caractère pour la signature
+        if (signature.length < 1) {
+            signature = 'S.';
         }
 
-        let media;
-        let sourceMessage;
+        // Vérifier si on a un média à traiter
+        let media = null;
+        let mediaType = null;
 
-        // Récupérer le média (depuis message cité ou direct)
         if (message.hasQuotedMsg) {
             const quotedMsg = await message.getQuotedMessage();
             if (!quotedMsg.hasMedia) {
                 return message.reply('❌ Le message cité doit contenir une image ou vidéo!');
             }
             media = await quotedMsg.downloadMedia();
-            sourceMessage = quotedMsg;
+            mediaType = quotedMsg.type;
         } else if (message.hasMedia) {
             media = await message.downloadMedia();
-            sourceMessage = message;
+            mediaType = message.type;
+        }
+
+        // Si pas de média, afficher l'aide
+        if (!media) {
+            return message.reply(`🎨 *Créateur de Stickers Avancé*
+
+📸 **Pour Images:**
+- Envoyez une photo + /sticker [signature]
+- Ou répondez à une image + /sticker [signature]
+
+🎬 **Pour Vidéos (Stickers Animés):**
+- Envoyez une vidéo + /sticker [signature]  
+- Ou répondez à une vidéo + /sticker [signature]
+
+✨ **Exemples:**
+- /sticker MonNom
+- /sticker @MonCompte
+- /sticker (utilise "S." par défaut)
+
+📋 **Formats supportés:**
+- Images: JPG, PNG, WebP, GIF
+- Vidéos: MP4, AVI, MOV, WebM (max 10 sec)
+
+💡 **Astuce:** La signature apparaîtra sous le sticker dans WhatsApp!`);
         }
 
         // Vérifier le type de média
-        const isImage = media.mimetype.startsWith('image/');
-        const isVideo = media.mimetype.startsWith('video/');
+        const isImage = media.mimetype.startsWith('image/') || mediaType === 'image';
+        const isVideo = media.mimetype.startsWith('video/') || mediaType === 'video';
+        const isGif = media.mimetype === 'image/gif';
 
         if (!isImage && !isVideo) {
-            return message.reply(`❌ *Format non supporté!*
-
-✅ *Formats acceptés:*
-• Images: JPG, PNG, WEBP
-• Vidéos: MP4, MOV, AVI, WEBM
-
-📎 Votre fichier: ${media.mimetype}`);
+            return message.reply('❌ Format non supporté! Utilisez une image ou vidéo.');
         }
 
         // Message de traitement
-        const processingMsg = isImage ? 
-            '🎨 Création du sticker en cours...' : 
-            '🎬 Création du sticker animé en cours...';
-        
-        await message.reply(processingMsg);
+        if (isVideo || isGif) {
+            await message.reply(`🎬 Création du sticker animé en cours...
+📝 Signature: "${signature}"
+⏱️ Cela peut prendre quelques secondes...`);
+        } else {
+            await message.reply(`🎨 Création du sticker en cours...
+📝 Signature: "${signature}"`);
+        }
 
-        // Sauvegarder le fichier temporaire
-        const fileExtension = isImage ? '.jpg' : '.mp4';
+        // Sauvegarder le fichier d'entrée
+        const inputExt = isVideo ? '.mp4' : (isGif ? '.gif' : '.jpg');
         const { filepath: inputPath } = await saveFile(
             Buffer.from(media.data, 'base64'), 
-            `media${fileExtension}`, 
+            `input${inputExt}`, 
             userId
         );
 
         let outputPath;
         let stickerBuffer;
 
-        if (isImage) {
-            // === TRAITEMENT IMAGE ===
-            outputPath = path.join(CONFIG.TEMP_DIR, `${userId}_sticker_${Date.now()}.webp`);
+        if (isVideo || isGif) {
+            // === TRAITEMENT VIDÉO/GIF (STICKER ANIMÉ) ===
+            outputPath = path.join(CONFIG.TEMP_DIR, `${userId}_animated_sticker_${Date.now()}.webp`);
             
-            try {
-                await sharp(inputPath)
-                    .resize(512, 512, { 
-                        fit: 'contain', 
-                        background: { r: 0, g: 0, b: 0, alpha: 0 } 
+            await new Promise((resolve, reject) => {
+                const ffmpegCommand = ffmpeg(inputPath)
+                    .size('512x512')
+                    .fps(15)
+                    .duration(10) // Max 10 secondes pour WhatsApp
+                    .videoCodec('libwebp')
+                    .outputOptions([
+                        '-vf', 'scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=transparent',
+                        '-loop', '0',
+                        '-preset', 'default',
+                        '-an', // Pas d'audio
+                        '-vsync', '0',
+                        '-f', 'webp'
+                    ])
+                    .on('start', (commandLine) => {
+                        console.log('🎬 FFmpeg démarré:', commandLine);
                     })
-                    .webp({ 
-                        quality: 90,
-                        effort: 6 
+                    .on('progress', (progress) => {
+                        if (progress.percent) {
+                            console.log(`🎬 Progression: ${Math.round(progress.percent)}%`);
+                        }
                     })
-                    .toFile(outputPath);
-
-                stickerBuffer = await fs.readFile(outputPath);
-                
-            } catch (error) {
-                console.error('❌ Erreur traitement image:', error.message);
-                await cleanupFile(inputPath);
-                return message.reply('❌ Erreur lors du traitement de l\'image. Vérifiez le format.');
-            }
-
-        } else {
-            // === TRAITEMENT VIDÉO ===
-            outputPath = path.join(CONFIG.TEMP_DIR, `${userId}_sticker_${Date.now()}.webp`);
-            
-            try {
-                await new Promise((resolve, reject) => {
-                    ffmpeg(inputPath)
-                        .inputOptions(['-t', '10']) // Limiter à 10 secondes
-                        .complexFilter([
-                            // Redimensionner et centrer
-                            '[0:v]scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0,setsar=1[v]'
-                        ])
-                        .outputOptions([
-                            '-map', '[v]',
-                            '-c:v', 'libwebp',
-                            '-lossless', '0',
-                            '-compression_level', '6',
-                            '-q:v', '80',
-                            '-loop', '0',
-                            '-preset', 'default',
-                            '-an', // Pas d'audio
-                            '-vsync', '0',
-                            '-fps_mode', 'passthrough'
-                        ])
-                        .format('webp')
-                        .on('start', (commandLine) => {
-                            console.log('🎬 FFmpeg started:', commandLine);
-                        })
-                        .on('progress', (progress) => {
-                            if (progress.percent) {
-                                console.log(`🎬 Progression: ${Math.round(progress.percent)}%`);
-                            }
-                        })
-                        .on('end', () => {
-                            console.log('✅ Conversion vidéo terminée');
-                            resolve();
-                        })
-                        .on('error', (error) => {
-                            console.error('❌ Erreur FFmpeg:', error.message);
-                            reject(error);
-                        })
-                        .save(outputPath);
-                });
-
-                stickerBuffer = await fs.readFile(outputPath);
-                
-            } catch (error) {
-                console.error('❌ Erreur traitement vidéo:', error.message);
-                await cleanupFile(inputPath);
-                return message.reply('❌ Erreur lors du traitement de la vidéo. Vérifiez le format et la durée.');
-            }
-        }
-
-        // === ENVOI DU STICKER ===
-        try {
-            const stickerMedia = new MessageMedia(
-                'image/webp', 
-                stickerBuffer.toString('base64'), 
-                isImage ? 'sticker.webp' : 'animated_sticker.webp'
-            );
-            
-            await client.sendMessage(chat.id._serialized, stickerMedia, {
-                sendMediaAsSticker: true,
-                stickerAuthor: signature,
-                stickerName: isImage ? 'Custom Sticker' : 'Animated Sticker',
-                stickerCategories: ['😀', '🎉']
+                    .on('end', () => {
+                        console.log('✅ Sticker animé créé avec succès');
+                        resolve();
+                    })
+                    .on('error', (err) => {
+                        console.error('❌ Erreur FFmpeg:', err.message);
+                        reject(err);
+                    })
+                    .save(outputPath);
             });
 
-            // Message de confirmation
-            const confirmMsg = isImage ? 
-                `✅ *Sticker créé avec succès!*\n👤 Signature: "${signature}"` :
-                `✅ *Sticker animé créé avec succès!*\n👤 Signature: "${signature}"\n🎬 Durée optimisée pour WhatsApp`;
-            
-            await message.reply(confirmMsg);
+            stickerBuffer = await fs.readFile(outputPath);
 
-        } catch (error) {
-            console.error('❌ Erreur envoi sticker:', error.message);
-            return message.reply('❌ Erreur lors de l\'envoi du sticker. Réessayez.');
+        } else {
+            // === TRAITEMENT IMAGE (STICKER STATIQUE) ===
+            outputPath = path.join(CONFIG.TEMP_DIR, `${userId}_static_sticker_${Date.now()}.webp`);
+            
+            await sharp(inputPath)
+                .resize(512, 512, { 
+                    fit: 'contain', 
+                    background: { r: 0, g: 0, b: 0, alpha: 0 } 
+                })
+                .webp({ 
+                    quality: 95,
+                    effort: 6
+                })
+                .toFile(outputPath);
+
+            stickerBuffer = await fs.readFile(outputPath);
         }
+
+        // === AJOUT DES MÉTADONNÉES EXIF ===
+        // Créer les métadonnées pour le sticker
+        const packName = `Stickers by ${signature}`;
+        const authorName = signature;
+        
+        // Créer le JSON des métadonnées
+        const exifData = {
+            "sticker-pack-id": generateId(),
+            "sticker-pack-name": packName,
+            "sticker-pack-publisher": authorName,
+            "sticker-pack-version": "1.0.0",
+            "android-app-store-link": "",
+            "ios-app-store-link": "",
+            "emojis": ["😀", "😊", "👍"]
+        };
+
+        // Convertir en format EXIF
+        const exifBuffer = Buffer.from(JSON.stringify(exifData));
+        
+        // Créer le MessageMedia avec les bonnes métadonnées
+        const stickerMedia = new MessageMedia(
+            'image/webp', 
+            stickerBuffer.toString('base64'), 
+            isVideo || isGif ? 'animated_sticker.webp' : 'sticker.webp'
+        );
+
+        // Envoyer le sticker avec les options appropriées
+        const messageOptions = {
+            sendMediaAsSticker: true,
+            stickerAuthor: authorName,
+            stickerName: packName,
+            stickerCategories: ['😀', '😊']
+        };
+
+        await client.sendMessage(chat.id._serialized, stickerMedia, messageOptions);
+
+        // Message de confirmation
+        const confirmMsg = isVideo || isGif ? 
+            `🎬 *Sticker Animé Créé!*\n📝 Signature: "${signature}"\n✨ Sticker envoyé avec succès!` :
+            `🎨 *Sticker Créé!*\n📝 Signature: "${signature}"\n✨ Sticker envoyé avec succès!`;
+
+        await message.reply(confirmMsg);
 
         // === NETTOYAGE ===
         await cleanupFile(inputPath);
         await cleanupFile(outputPath);
 
-        console.log(`✅ Sticker ${isImage ? 'image' : 'vidéo'} créé pour ${userId} avec signature "${signature}"`);
-
     } catch (error) {
-        console.error('❌ Erreur générale Sticker:', error.message);
-        await message.reply(`❌ Une erreur inattendue s'est produite lors de la création du sticker.
-
-🔄 Conseils:
-• Vérifiez que votre fichier n'est pas corrompu
-• Essayez avec un fichier plus petit
-• Pour les vidéos, max 10 secondes recommandées`);
+        console.error('❌ Erreur Sticker:', error.message);
+        
+        // Messages d'erreur spécifiques
+        if (error.message.includes('ffmpeg')) {
+            await message.reply('❌ Erreur lors du traitement vidéo. Vérifiez que le format est supporté (MP4, AVI, MOV, WebM).');
+        } else if (error.message.includes('sharp')) {
+            await message.reply('❌ Erreur lors du traitement image. Vérifiez que le format est supporté (JPG, PNG, WebP).');
+        } else {
+            await message.reply('❌ Erreur lors de la création du sticker. Réessayez avec un autre fichier.');
+        }
     }
 }
 
-// === FONCTION UTILITAIRE POUR VALIDATION DES MÉDIAS ===
-function validateMedia(media) {
-    const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    const validVideoTypes = ['video/mp4', 'video/mov', 'video/avi', 'video/webm', 'video/quicktime'];
-    
-    const isValidImage = validImageTypes.includes(media.mimetype);
-    const isValidVideo = validVideoTypes.includes(media.mimetype);
-    
-    return {
-        isValid: isValidImage || isValidVideo,
-        isImage: isValidImage,
-        isVideo: isValidVideo,
-        type: media.mimetype
+// Fonction utilitaire pour créer des métadonnées EXIF personnalisées
+function createStickerExif(packName, authorName) {
+    const exifData = {
+        "sticker-pack-id": generateId(),
+        "sticker-pack-name": packName,
+        "sticker-pack-publisher": authorName,
+        "sticker-pack-version": "1.0.0"
     };
+    
+    return Buffer.from(JSON.stringify(exifData));
 }
 
-// === FONCTION POUR OBTENIR LA DURÉE D'UNE VIDÉO ===
-function getVideoDuration(filepath) {
-    return new Promise((resolve, reject) => {
-        ffmpeg.ffprobe(filepath, (err, metadata) => {
-            if (err) {
-                reject(err);
-            } else {
-                const duration = metadata.format.duration;
-                resolve(duration);
-            }
-        });
-    });
+// Fonction pour valider et optimiser les paramètres de signature
+function validateSignature(signature, contact) {
+    // Si pas de signature, utiliser "S." par défaut
+    if (!signature || signature.trim() === '') {
+        return 'S.';
+    }
+    
+    // Nettoyer la signature
+    signature = signature.trim();
+    
+    // Limiter la longueur à 20 caractères
+    if (signature.length > 20) {
+        signature = signature.substring(0, 20);
+    }
+    
+    // Remplacer les caractères spéciaux problématiques
+    signature = signature.replace(/[<>:"/\\|?*]/g, '');
+    
+    // Si la signature devient vide après nettoyage, utiliser le nom du contact ou "S."
+    if (signature === '') {
+        signature = contact?.pushname?.substring(0, 10) || 'S.';
+    }
+    
+    return signature;
 }
+
+// Fonction pour détecter automatiquement le type de média optimal
+function detectOptimalStickerType(media, mediaType) {
+    const isImage = media.mimetype.startsWith('image/') || mediaType === 'image';
+    const isVideo = media.mimetype.startsWith('video/') || mediaType === 'video';
+    const isGif = media.mimetype === 'image/gif';
+    
+    // Prioriser les GIFs comme stickers animés
+    if (isGif) {
+        return 'animated';
+    }
+    
+    // Vidéos comme stickers animés
+    if (isVideo) {
+        return 'animated';
+    }
+    
+    // Images comme stickers statiques
+    if (isImage) {
+        return 'static';
+    }
+    
+    return 'unknown';
+}
+
 // 3. Commande Quiz améliorée avec possibilité d'annulation
 async function quizCommand(client, message, args) {
     try {
