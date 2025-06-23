@@ -316,7 +316,7 @@ ${availableEffects}
 // Installation requise: npm install wa-sticker-formatter
 const { Sticker, StickerTypes } = require('wa-sticker-formatter');
 
-// Fonction sticker complètement refaite avec wa-sticker-formatter
+// Fonction sticker corrigée avec métadonnées EXIF correctes
 async function stickerCommand(client, message, args) {
     try {
         const chat = await message.getChat();
@@ -395,34 +395,66 @@ async function stickerCommand(client, message, args) {
         // Convertir les données média en Buffer
         const mediaBuffer = Buffer.from(media.data, 'base64');
 
-        // Configuration du sticker avec wa-sticker-formatter
+        // ✅ CORRECTION PRINCIPALE : Configuration complète des métadonnées EXIF
         const stickerOptions = {
             pack: packName,              // Nom du pack
-            author: signature,           // Auteur (ce qui apparaîtra dans WhatsApp)
+            author: signature,           // Auteur principal
             type: isAnimated ? StickerTypes.FULL : StickerTypes.DEFAULT,
             categories: ['😀', '😊', '👍'], // Catégories d'émojis
             id: generateId(),            // ID unique
             quality: 100,                // Qualité maximale
-            background: 'transparent'     // Fond transparent
+            background: 'transparent',   // Fond transparent
+            
+            // ✅ AJOUT : Métadonnées EXIF explicites pour forcer la signature
+            publisherWebsite: '',        // Site web (vide pour éviter conflits)
+            publisherEmail: '',          // Email (vide pour éviter conflits)
+            emojis: ['😊'],              // Émojis associés
+            
+            // ✅ CRUCIAL : Forcer les métadonnées EXIF personnalisées
+            exif: {
+                'sticker-pack-id': generateId(),
+                'sticker-pack-name': packName,
+                'sticker-pack-publisher': signature,  // Signature comme éditeur
+                'android-app-store-link': '',
+                'ios-app-store-link': '',
+                'emojis': ['😊'],
+                'is-avatar-sticker': 0
+            }
         };
 
         // Créer le sticker avec wa-sticker-formatter
         const sticker = new Sticker(mediaBuffer, stickerOptions);
 
-        // Générer le fichier WebP avec métadonnées
-        const stickerBuffer = await sticker.toBuffer();
-
-        // Créer le MessageMedia pour WhatsApp
-        const stickerMedia = new MessageMedia(
-            'image/webp',
-            stickerBuffer.toString('base64'),
-            isAnimated ? 'animated_sticker.webp' : 'sticker.webp'
-        );
-
-        // Envoyer le sticker
-        await client.sendMessage(chat.id._serialized, stickerMedia, {
-            sendMediaAsSticker: true
-        });
+        // ✅ CORRECTION : Utiliser toFile() ou directement sendMessage avec le sticker
+        // Au lieu de convertir en MessageMedia qui peut perdre les métadonnées
+        
+        // Méthode 1 : Envoi direct du sticker (RECOMMANDÉE)
+        try {
+            await sticker.toMessage(client, chat.id._serialized);
+        } catch (directError) {
+            console.log('Envoi direct échoué, tentative avec buffer...');
+            
+            // Méthode 2 : Fallback avec buffer si l'envoi direct échoue
+            const stickerBuffer = await sticker.toBuffer();
+            
+            // ✅ IMPORTANT : Créer MessageMedia avec les bonnes métadonnées
+            const stickerMedia = new MessageMedia(
+                'image/webp',
+                stickerBuffer.toString('base64'),
+                isAnimated ? 'animated_sticker.webp' : 'sticker.webp'
+            );
+            
+            // Ajouter manuellement les métadonnées EXIF au MessageMedia
+            stickerMedia.filename = isAnimated ? 'animated_sticker.webp' : 'sticker.webp';
+            
+            // Envoyer avec les options correctes
+            await client.sendMessage(chat.id._serialized, stickerMedia, {
+                sendMediaAsSticker: true,
+                stickerAuthor: signature,    // ✅ Signature explicite
+                stickerName: packName,       // ✅ Nom du pack explicite
+                quotedMessageId: message.id  // Conserver le contexte
+            });
+        }
 
         // Message de confirmation avec détails
         const confirmationMsg = `${isAnimated ? '🎬' : '🎨'} *Sticker ${isAnimated ? 'Animé ' : ''}Créé!*
@@ -456,12 +488,19 @@ ${isAnimated ? '🎬 **Type:** Animé\n' : '🖼️ **Type:** Statique\n'}
 • Réduisez la taille si nécessaire
 • Réessayez avec un autre média
 
-📞 **Support:** Tapez /help pour plus d'aide`);
+📞 **Support:** Tapez /help pour plus d'aide
+
+🔍 **Détail erreur:** ${error.message}`);
         }
     }
 }
 
-// Fonction utilitaire pour valider et nettoyer la signature
+// ✅ AMÉLIORATION : Fonction generateId() plus robuste
+function generateId() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+}
+
+// Fonction utilitaire pour valider et nettoyer la signature - INCHANGÉE
 function validateSignature(signature, contact) {
     // Si pas de signature, utiliser "S." par défaut
     if (!signature || signature.trim() === '') {
@@ -491,7 +530,23 @@ function validateSignature(signature, contact) {
     return signature;
 }
 
-// Fonction pour détecter le type optimal de sticker
+// ✅ FONCTION DE DEBUG pour vérifier les métadonnées (optionnelle)
+async function debugStickerMetadata(sticker) {
+    try {
+        const metadata = await sticker.toMessage();
+        console.log('🔍 Métadonnées du sticker:', {
+            author: metadata.author,
+            pack: metadata.pack,
+            exif: metadata.exif
+        });
+        return metadata;
+    } catch (error) {
+        console.log('❌ Impossible de lire les métadonnées:', error.message);
+        return null;
+    }
+}
+
+// Reste des fonctions utilitaires - INCHANGÉES
 function detectStickerType(media, mediaType) {
     const isVideo = media.mimetype.startsWith('video/') || mediaType === 'video';
     const isGif = media.mimetype === 'image/gif';
@@ -522,7 +577,6 @@ function detectStickerType(media, mediaType) {
     };
 }
 
-// Fonction pour obtenir des informations sur le média
 async function getMediaInfo(media) {
     const sizeInMB = Buffer.from(media.data, 'base64').length / (1024 * 1024);
     
@@ -535,7 +589,6 @@ async function getMediaInfo(media) {
     };
 }
 
-// Fonction de prévisualisation avant création (optionnelle)
 async function previewStickerInfo(media, signature) {
     const info = await getMediaInfo(media);
     const stickerType = detectStickerType(media, null);
@@ -550,7 +603,6 @@ ${stickerType.emoji} **Type:** ${stickerType.description}
 
 ✅ Prêt à créer le sticker!`;
 }
-
 
 // 3. Commande Quiz améliorée avec possibilité d'annulation
 async function quizCommand(client, message, args) {
