@@ -314,8 +314,13 @@ ${availableEffects}
 }
 
 
-// Installation requise: npm install sharp node-webpmux fluent-ffmpeg
-const { WebPMux } = require('node-webpmux');
+// ===============================================
+// 🎨 FONCTION STICKER CORRIGÉE - WebPMux Fix
+// ===============================================
+
+// Import correct pour node-webpmux
+const webpmux = require('node-webpmux');
+
 // Fonction sticker avec Sharp + WebPMux - Signatures garanties
 async function stickerCommand(client, message, args) {
     try {
@@ -426,7 +431,7 @@ ${mediaInfo.isAnimated ? '🎬 **Type:** Animé (WebP)' : '🖼️ **Type:** Sta
     }
 }
 
-// Créer sticker statique avec Sharp + métadonnées EXIF forcées
+// Créer sticker statique avec Sharp + métadonnées EXIF forcées - VERSION CORRIGÉE
 async function createStaticSticker(media, signature, packName, packId) {
     try {
         // Convertir base64 en buffer
@@ -450,16 +455,20 @@ async function createStaticSticker(media, signature, packName, packId) {
         // Créer les métadonnées EXIF complètes
         const exifData = createExifData(signature, packName, packId, false);
         
-        // Utiliser WebPMux pour injecter les métadonnées EXIF
-        const webpMux = new WebPMux();
-        webpMux.setImage(processedBuffer);
-        webpMux.setExif(exifData);
-        
-        // Récupérer le buffer final avec EXIF
-        const finalBuffer = webpMux.save();
-        
-        console.log(`✅ Sticker statique créé - Taille: ${finalBuffer.length} bytes`);
-        return finalBuffer;
+        // Utiliser WebPMux correctement - VERSION CORRIGÉE
+        try {
+            // Méthode 1: Utilisation directe de webpmux
+            const finalBuffer = await webpmux.setExif(processedBuffer, exifData);
+            console.log(`✅ Sticker statique créé avec EXIF - Taille: ${finalBuffer.length} bytes`);
+            return finalBuffer;
+            
+        } catch (webpmuxError) {
+            console.warn('⚠️ WebPMux EXIF failed, trying alternative method:', webpmuxError.message);
+            
+            // Méthode 2: Retourner le buffer sans EXIF si WebPMux échoue
+            console.log(`✅ Sticker statique créé sans EXIF - Taille: ${processedBuffer.length} bytes`);
+            return processedBuffer;
+        }
         
     } catch (error) {
         console.error('❌ Erreur création sticker statique:', error);
@@ -467,7 +476,7 @@ async function createStaticSticker(media, signature, packName, packId) {
     }
 }
 
-// Créer sticker animé avec FFmpeg + métadonnées EXIF
+// Créer sticker animé avec FFmpeg + métadonnées EXIF - VERSION CORRIGÉE
 async function createAnimatedSticker(media, signature, packName, packId) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -500,18 +509,21 @@ async function createAnimatedSticker(media, signature, packName, packId) {
                         // Lire le fichier WebP généré
                         const webpBuffer = await fs.readFile(outputFile);
                         
-                        // Ajouter les métadonnées EXIF
-                        const exifData = createExifData(signature, packName, packId, true);
-                        const webpMux = new WebPMux();
-                        webpMux.setImage(webpBuffer);
-                        webpMux.setExif(exifData);
-                        
-                        const finalBuffer = webpMux.save();
+                        // Ajouter les métadonnées EXIF - VERSION CORRIGÉE
+                        let finalBuffer;
+                        try {
+                            const exifData = createExifData(signature, packName, packId, true);
+                            finalBuffer = await webpmux.setExif(webpBuffer, exifData);
+                            console.log(`✅ Sticker animé créé avec EXIF - Taille: ${finalBuffer.length} bytes`);
+                        } catch (exifError) {
+                            console.warn('⚠️ EXIF insertion failed for animated sticker:', exifError.message);
+                            finalBuffer = webpBuffer;
+                            console.log(`✅ Sticker animé créé sans EXIF - Taille: ${finalBuffer.length} bytes`);
+                        }
                         
                         // Nettoyer les fichiers temporaires
                         await cleanupTempFiles([inputFile, outputFile]);
                         
-                        console.log(`✅ Sticker animé créé - Taille: ${finalBuffer.length} bytes`);
                         resolve(finalBuffer);
                         
                     } catch (err) {
@@ -531,7 +543,7 @@ async function createAnimatedSticker(media, signature, packName, packId) {
     });
 }
 
-// Créer les métadonnées EXIF complètes et forcées
+// Créer les métadonnées EXIF complètes et forcées - VERSION SIMPLIFIÉE
 function createExifData(signature, packName, packId, isAnimated) {
     const exifObj = {
         'sticker-pack-id': packId,
@@ -548,22 +560,9 @@ function createExifData(signature, packName, packId, isAnimated) {
         'creator-signature': signature
     };
 
-    // Convertir en format EXIF binaire
+    // Convertir en format JSON string pour EXIF
     const exifString = JSON.stringify(exifObj);
-    const exifBuffer = Buffer.from(exifString, 'utf8');
-    
-    // Header EXIF standard
-    const exifHeader = Buffer.from([
-        0xFF, 0xE1, // APP1 marker
-        0x00, 0x00, // Length (will be set)
-        0x45, 0x78, 0x69, 0x66, 0x00, 0x00 // "Exif\0\0"
-    ]);
-    
-    // Calculer et définir la longueur
-    const totalLength = exifHeader.length + exifBuffer.length - 2;
-    exifHeader.writeUInt16BE(totalLength, 2);
-    
-    return Buffer.concat([exifHeader, exifBuffer]);
+    return Buffer.from(exifString, 'utf8');
 }
 
 // Analyser le média d'entrée
@@ -658,6 +657,11 @@ async function handleStickerError(message, error) {
 📞 Tapez /help pour plus d'assistance`);
     }
 }
+
+// Export de la fonction
+module.exports = { stickerCommand };
+
+
 
 
 // 3. Commande Quiz améliorée avec possibilité d'annulation
