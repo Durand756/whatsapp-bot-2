@@ -76,24 +76,44 @@ async function cleanupFile(filepath) {
 
 // === COMMANDES ===
 
-// 1. Commande Voice FX
+// Commande Voice FX avec 16 effets vocaux
 async function voiceFxCommand(client, message, args) {
     try {
         const chat = await message.getChat();
         const userId = message.author || message.from;
         
         if (!message.hasQuotedMsg) {
-            return message.reply(`🎤 *Voice FX*
+            return message.reply(`🎤 *Voice FX - 16 Effets Vocaux*
 
 Répondez à un message vocal avec:
-/voicefx robot - Voix robotique
+
+🤖 **Effets Robotiques:**
+/voicefx robot - Voix robotique classique
+/voicefx cyborg - Voix cybernétique
+/voicefx metallic - Voix métallique
+
+🎭 **Effets Créatifs:**
 /voicefx cartoon - Voix de dessin animé
+/voicefx alien - Voix extraterrestre
+/voicefx demon - Voix démoniaque
+/voicefx ghost - Voix fantôme
+
+🎵 **Effets Audio:**
+/voicefx echo - Effet d'écho
+/voicefx reverb - Réverbération
+/voicefx distortion - Distorsion
+/voicefx whisper - Chuchotement
+
+⚡ **Effets de Vitesse:**
+/voicefx speed - Accélérer la voix
+/voicefx slow - Ralentir la voix
+
+🎚️ **Effets de Tonalité:**
 /voicefx grave - Voix plus grave
 /voicefx aigu - Voix plus aiguë
-/voicefx echo - Effet d'écho
-/voicefx speed - Accélérer la voix
+/voicefx deep - Voix très profonde
 
-💡 Exemple: Répondez à un vocal puis tapez "/voicefx robot"`);
+💡 **Exemple:** Répondez à un vocal puis tapez "/voicefx alien"`);
         }
 
         const quotedMsg = await message.getQuotedMessage();
@@ -102,52 +122,194 @@ Répondez à un message vocal avec:
         }
 
         const effect = args[0] || 'robot';
+        
+        // 16 effets vocaux différents
         const effects = {
-            robot: 'asetrate=44100*0.8,aresample=44100,atempo=1.25',
-            cartoon: 'asetrate=44100*1.4,aresample=44100,atempo=0.8',
-            grave: 'asetrate=44100*0.6,aresample=44100',
-            aigu: 'asetrate=44100*1.6,aresample=44100',
-            echo: 'aecho=0.8:0.9:1000:0.3',
-            speed: 'atempo=1.5'
+            // Effets robotiques
+            robot: {
+                filter: 'asetrate=44100*0.8,aresample=44100,atempo=1.25',
+                emoji: '🤖',
+                name: 'Robot'
+            },
+            cyborg: {
+                filter: 'asetrate=44100*0.7,aresample=44100,atempo=1.3,tremolo=f=10:d=0.5',
+                emoji: '🦾',
+                name: 'Cyborg'
+            },
+            metallic: {
+                filter: 'asetrate=44100*0.75,aresample=44100,atempo=1.2,highpass=f=1000',
+                emoji: '🔩',
+                name: 'Métallique'
+            },
+            
+            // Effets créatifs
+            cartoon: {
+                filter: 'asetrate=44100*1.4,aresample=44100,atempo=0.8',
+                emoji: '🎭',
+                name: 'Cartoon'
+            },
+            alien: {
+                filter: 'asetrate=44100*1.8,aresample=44100,atempo=0.7,tremolo=f=5:d=0.8',
+                emoji: '👽',
+                name: 'Alien'
+            },
+            demon: {
+                filter: 'asetrate=44100*0.5,aresample=44100,atempo=1.4,lowpass=f=800',
+                emoji: '👹',
+                name: 'Démon'
+            },
+            ghost: {
+                filter: 'asetrate=44100*1.2,aresample=44100,atempo=0.9,tremolo=f=3:d=0.7,volume=0.6',
+                emoji: '👻',
+                name: 'Fantôme'
+            },
+            
+            // Effets audio
+            echo: {
+                filter: 'aecho=0.8:0.9:1000:0.3',
+                emoji: '🔊',
+                name: 'Echo'
+            },
+            reverb: {
+                filter: 'aecho=0.8:0.88:60:0.4,aecho=0.8:0.88:40:0.3',
+                emoji: '🎵',
+                name: 'Reverb'
+            },
+            distortion: {
+                filter: 'overdrive=20:20',
+                emoji: '⚡',
+                name: 'Distorsion'
+            },
+            whisper: {
+                filter: 'volume=0.3,highpass=f=100,lowpass=f=3000',
+                emoji: '🤫',
+                name: 'Chuchotement'
+            },
+            
+            // Effets de vitesse
+            speed: {
+                filter: 'atempo=1.5',
+                emoji: '💨',
+                name: 'Rapide'
+            },
+            slow: {
+                filter: 'atempo=0.7',
+                emoji: '🐌',
+                name: 'Lent'
+            },
+            
+            // Effets de tonalité
+            grave: {
+                filter: 'asetrate=44100*0.6,aresample=44100',
+                emoji: '🎚️',
+                name: 'Grave'
+            },
+            aigu: {
+                filter: 'asetrate=44100*1.6,aresample=44100',
+                emoji: '🎼',
+                name: 'Aigu'
+            },
+            deep: {
+                filter: 'asetrate=44100*0.4,aresample=44100,atempo=1.8,lowpass=f=1000',
+                emoji: '🌊',
+                name: 'Profond'
+            }
         };
 
         if (!effects[effect]) {
-            return message.reply('❌ Effet non reconnu! Utilisez: robot, cartoon, grave, aigu, echo, speed');
+            const availableEffects = Object.keys(effects).join(', ');
+            return message.reply(`❌ Effet non reconnu! 
+
+🎤 **Effets disponibles:**
+${availableEffects}
+
+💡 Tapez "/voicefx" sans argument pour voir la liste complète avec descriptions.`);
         }
 
-        await message.reply('🎵 Application de l\'effet vocal...');
+        const selectedEffect = effects[effect];
+        await message.reply(`${selectedEffect.emoji} Application de l'effet "${selectedEffect.name}"...`);
 
         // Télécharger le fichier audio
         const media = await quotedMsg.downloadMedia();
         const { filepath: inputPath } = await saveFile(Buffer.from(media.data, 'base64'), 'voice.ogg', userId);
-        const outputPath = path.join(CONFIG.TEMP_DIR, `${userId}_fx_${Date.now()}.mp3`);
+        const outputPath = path.join(CONFIG.TEMP_DIR, `${userId}_fx_${effect}_${Date.now()}.mp3`);
 
         // Appliquer l'effet avec FFmpeg
         await new Promise((resolve, reject) => {
             ffmpeg(inputPath)
-                .audioFilters(effects[effect])
+                .audioFilters(selectedEffect.filter)
                 .audioCodec('libmp3lame')
+                .audioBitrate('128k')
                 .toFormat('mp3')
-                .on('end', resolve)
-                .on('error', reject)
+                .on('start', (commandLine) => {
+                    console.log(`🎵 FFmpeg started: ${commandLine}`);
+                })
+                .on('progress', (progress) => {
+                    if (progress.percent) {
+                        console.log(`⏳ Progress: ${Math.round(progress.percent)}%`);
+                    }
+                })
+                .on('end', () => {
+                    console.log('✅ Voice FX processing completed');
+                    resolve();
+                })
+                .on('error', (err) => {
+                    console.error('❌ FFmpeg error:', err.message);
+                    reject(err);
+                })
                 .save(outputPath);
         });
+
+        // Vérifier que le fichier de sortie existe
+        try {
+            await fs.access(outputPath);
+        } catch (error) {
+            throw new Error('Le fichier de sortie n\'a pas été créé');
+        }
 
         // Envoyer le résultat
         const resultBuffer = await fs.readFile(outputPath);
         const resultMedia = new MessageMedia('audio/mpeg', resultBuffer.toString('base64'), `voicefx_${effect}.mp3`);
         
         await client.sendMessage(chat.id._serialized, resultMedia, {
-            caption: `🎤 *Voice FX - ${effect.toUpperCase()}*\n✨ Effet appliqué avec succès!`
+            caption: `${selectedEffect.emoji} *Voice FX - ${selectedEffect.name.toUpperCase()}*
+✨ Effet appliqué avec succès!
+🎤 Essayez d'autres effets avec /voicefx`
         });
 
-        // Nettoyage
+        console.log(`✅ Voice FX ${effect} applied successfully for user ${userId}`);
+
+        // Nettoyage des fichiers temporaires
         await cleanupFile(inputPath);
         await cleanupFile(outputPath);
 
     } catch (error) {
         console.error('❌ Erreur Voice FX:', error.message);
-        await message.reply('❌ Erreur lors de l\'application de l\'effet vocal');
+        
+        // Message d'erreur personnalisé selon le type d'erreur
+        let errorMessage = '❌ Erreur lors de l\'application de l\'effet vocal';
+        
+        if (error.message.includes('ffmpeg')) {
+            errorMessage += '\n🔧 Problème de traitement audio';
+        } else if (error.message.includes('media')) {
+            errorMessage += '\n📱 Problème de téléchargement du vocal';
+        } else if (error.message.includes('fichier')) {
+            errorMessage += '\n💾 Problème de sauvegarde';
+        }
+        
+        errorMessage += '\n\n💡 Réessayez dans quelques instants';
+        
+        await message.reply(errorMessage);
+        
+        // Nettoyage en cas d'erreur
+        try {
+            const inputPath = path.join(CONFIG.TEMP_DIR, `${userId}_voice.ogg`);
+            const outputPath = path.join(CONFIG.TEMP_DIR, `${userId}_fx_${args[0] || 'robot'}_${Date.now()}.mp3`);
+            await cleanupFile(inputPath);
+            await cleanupFile(outputPath);
+        } catch (cleanupError) {
+            console.error('❌ Erreur nettoyage:', cleanupError.message);
+        }
     }
 }
 
@@ -249,159 +411,485 @@ Envoyez une image/vidéo ou répondez à une image/vidéo avec:
     }
 }
 
-// 3. Commande Quiz
+// 3. Commande Quiz améliorée avec possibilité d'annulation
 async function quizCommand(client, message, args) {
     try {
         const userId = message.author || message.from;
         const chat = await message.getChat();
+        const contact = await message.getContact();
+        const userName = contact.pushname || 'Utilisateur';
         
-        if (args[0] === 'create' || args[0] === 'créer') {
+        if (args[0] === 'create' || args[0] === 'créer' || args[0] === 'creer') {
             // Démarrer la création d'un quiz
             state.users.set(userId, { 
                 action: 'creating_quiz', 
                 step: 'title',
-                quiz: { questions: [], title: '', id: generateId() }
+                quiz: { 
+                    questions: [], 
+                    title: '', 
+                    id: generateId(),
+                    creator: userName,
+                    createdAt: new Date(),
+                    category: null,
+                    difficulty: null
+                }
             });
             
-            return message.reply(`🧠 *Créateur de Quiz*
+            return message.reply(`🧠 *Créateur de Quiz Avancé*
 
-Étape 1/4: Quel est le titre de votre quiz?
-Exemple: "Quel personnage Disney es-tu?"`);
+👋 Salut ${userName}! Créons un super quiz ensemble!
+
+📝 **Étape 1/6: Titre du Quiz**
+Quel est le titre de votre quiz?
+
+💡 **Exemples:**
+• "Quel personnage Disney es-tu?"
+• "Culture Générale 2024"
+• "Test de Personnalité"
+• "Connais-tu bien ton pays?"
+
+⚠️ **À tout moment, tapez "annuler" pour arrêter la création**`);
             
-        } else if (args[0] === 'answer' || args[0] === 'répondre') {
+        } else if (args[0] === 'answer' || args[0] === 'répondre' || args[0] === 'repondre') {
             // Répondre à un quiz
             const quizId = args[1];
             const answers = args.slice(2).join(' ');
             
             if (!quizId || !answers) {
-                return message.reply('❌ Usage: /quiz répondre [ID] [réponses]\nExemple: /quiz répondre ABC123 1a 2b 3c');
+                return message.reply(`❌ **Usage incorrect!**
+
+🎯 **Format correct:**
+/quiz répondre [ID] [réponses]
+
+💡 **Exemple:**
+/quiz répondre ABC123 1a 2b 3c 4d
+
+📝 **Explication:**
+• 1a = Question 1, réponse A
+• 2b = Question 2, réponse B
+• etc...`);
             }
 
             const quiz = state.quizzes.get(quizId);
             if (!quiz) {
-                return message.reply('❌ Quiz non trouvé ou expiré!');
+                return message.reply(`❌ **Quiz introuvable!**
+
+🔍 Le quiz "${quizId}" n'existe pas ou a expiré.
+
+💡 **Créez votre propre quiz avec:**
+/quiz créer`);
             }
 
             // Analyser les réponses
             const userAnswers = answers.match(/\d+[a-d]/gi) || [];
             let correct = 0;
-            let result = `🧠 *Résultats du Quiz: ${quiz.title}*\n\n`;
+            let details = '';
+            
+            let result = `🧠 **Résultats du Quiz: ${quiz.title}**\n`;
+            result += `👤 Par: ${quiz.creator}\n`;
+            result += `📊 Catégorie: ${quiz.category || 'Général'}\n`;
+            result += `⭐ Difficulté: ${quiz.difficulty || 'Normale'}\n\n`;
 
             quiz.questions.forEach((q, index) => {
                 const userAnswer = userAnswers.find(a => a.startsWith((index + 1).toString()));
-                const correctAnswer = q.correct;
+                const correctLetter = q.correct;
+                const questionNum = index + 1;
                 
-                if (userAnswer && correctAnswer && userAnswer.toLowerCase() === `${index + 1}${correctAnswer}`.toLowerCase()) {
+                if (userAnswer && correctLetter && userAnswer.toLowerCase() === `${questionNum}${correctLetter}`.toLowerCase()) {
                     correct++;
-                    result += `✅ Question ${index + 1}: Correct!\n`;
+                    details += `✅ **Q${questionNum}:** Correct! (${correctLetter.toUpperCase()})\n`;
                 } else {
-                    result += `❌ Question ${index + 1}: ${correctAnswer ? `Réponse: ${correctAnswer}` : 'Incorrect'}\n`;
+                    const userChoice = userAnswer ? userAnswer.charAt(userAnswer.length - 1).toUpperCase() : 'Pas de réponse';
+                    const correctChoice = correctLetter ? correctLetter.toUpperCase() : 'Pas définie';
+                    details += `❌ **Q${questionNum}:** ${userChoice} → Réponse: ${correctChoice}\n`;
+                    
+                    // Ajouter explication si disponible
+                    if (q.explanation) {
+                        details += `   💡 ${q.explanation}\n`;
+                    }
                 }
             });
 
             const percentage = Math.round((correct / quiz.questions.length) * 100);
-            result += `\n📊 Score: ${correct}/${quiz.questions.length} (${percentage}%)\n`;
             
-            if (percentage >= 80) result += `🏆 Excellent! Tu maîtrises le sujet!`;
-            else if (percentage >= 60) result += `👍 Bien joué! Pas mal du tout!`;
-            else if (percentage >= 40) result += `📚 Il faut réviser un peu plus!`;
-            else result += `💪 N'abandonne pas, continue d'apprendre!`;
+            // Système de notation avancé
+            let grade, emoji, comment;
+            if (percentage >= 90) {
+                grade = 'A+'; emoji = '🏆'; comment = 'PARFAIT! Tu es un expert!';
+            } else if (percentage >= 80) {
+                grade = 'A'; emoji = '🥇'; comment = 'Excellent! Très impressionnant!';
+            } else if (percentage >= 70) {
+                grade = 'B+'; emoji = '🥈'; comment = 'Très bien! Tu maîtrises le sujet!';
+            } else if (percentage >= 60) {
+                grade = 'B'; emoji = '🥉'; comment = 'Bien joué! C\'est un bon résultat!';
+            } else if (percentage >= 50) {
+                grade = 'C'; emoji = '📚'; comment = 'Pas mal! Continue à apprendre!';
+            } else if (percentage >= 30) {
+                grade = 'D'; emoji = '💪'; comment = 'Il faut réviser, mais n\'abandonne pas!';
+            } else {
+                grade = 'F'; emoji = '🔄'; comment = 'Réessaye! L\'apprentissage est un processus!';
+            }
+            
+            result += `📈 **RÉSULTATS DÉTAILLÉS:**\n${details}\n`;
+            result += `🎯 **SCORE FINAL:** ${correct}/${quiz.questions.length} (${percentage}%)\n`;
+            result += `📝 **NOTE:** ${grade} ${emoji}\n`;
+            result += `💬 **${comment}**\n\n`;
+            result += `🎮 Merci d'avoir joué! Créez votre quiz avec /quiz créer`;
 
             return message.reply(result);
+            
+        } else if (args[0] === 'list' || args[0] === 'liste') {
+            // Lister les quiz disponibles
+            if (state.quizzes.size === 0) {
+                return message.reply(`📝 **Aucun Quiz Disponible**
+
+🎮 Soyez le premier à créer un quiz!
+/quiz créer`);
+            }
+            
+            let quizList = `📋 **Quiz Disponibles (${state.quizzes.size})**\n\n`;
+            let count = 1;
+            
+            for (const [id, quiz] of state.quizzes.entries()) {
+                const timeLeft = Math.ceil((24 * 60 * 60 * 1000 - (Date.now() - quiz.createdAt.getTime())) / (60 * 60 * 1000));
+                quizList += `${count}. **${quiz.title}**\n`;
+                quizList += `   🆔 ID: ${id}\n`;
+                quizList += `   👤 Créateur: ${quiz.creator}\n`;
+                quizList += `   📊 ${quiz.questions.length} questions\n`;
+                quizList += `   ⏰ Expire dans ${timeLeft}h\n\n`;
+                count++;
+            }
+            
+            quizList += `🎯 **Pour jouer:** /quiz répondre [ID] [réponses]`;
+            return message.reply(quizList);
+            
+        } else if (args[0] === 'help' || args[0] === 'aide') {
+            return message.reply(`🧠 **Guide Complet des Quiz**
+
+🎮 **COMMANDES PRINCIPALES:**
+📝 /quiz créer - Créer un nouveau quiz
+🎯 /quiz répondre [ID] [réponses] - Jouer à un quiz
+📋 /quiz liste - Voir tous les quiz disponibles
+❓ /quiz aide - Voir ce guide
+
+🎯 **COMMENT JOUER:**
+1. Trouvez l'ID du quiz (ex: ABC123)
+2. Répondez: /quiz répondre ABC123 1a 2b 3c
+3. Format: [numéro question][lettre réponse]
+
+📝 **CRÉATION DE QUIZ:**
+• 6 étapes guidées
+• Jusqu'à 15 questions
+• Catégories et difficultés
+• Explications optionnelles
+• Annulation possible à tout moment
+
+🏆 **SYSTÈME DE NOTATION:**
+• A+ (90-100%) - 🏆 Expert
+• A (80-89%) - 🥇 Excellent  
+• B+ (70-79%) - 🥈 Très bien
+• B (60-69%) - 🥉 Bien
+• C (50-59%) - 📚 Correct
+• D (30-49%) - 💪 À améliorer
+• F (0-29%) - 🔄 Réessayer
+
+✨ Amusez-vous bien!`);
         }
 
         // Menu principal des quiz
-        return message.reply(`🧠 *Quiz WhatsApp*
+        return message.reply(`🧠 **Quiz WhatsApp - Menu Principal**
 
-📝 /quiz créer - Créer un nouveau quiz
-🎯 /quiz répondre [ID] [réponses] - Répondre à un quiz
+🎮 **ACTIONS RAPIDES:**
+📝 /quiz créer - Nouveau quiz interactif
+📋 /quiz liste - Voir les quiz disponibles  
+❓ /quiz aide - Guide complet
 
-💡 *Comment répondre à un quiz:*
-Format: /quiz répondre ABC123 1a 2b 3c
-(1a = question 1 réponse a, etc.)
+📊 **STATISTIQUES:**
+👥 ${state.users.size} utilisateurs actifs
+🧠 ${state.quizzes.size} quiz en ligne
+⚡ ${Math.floor(process.uptime() / 60)} minutes d'uptime
 
-🎮 Créez des quiz amusants et défiez vos amis!`);
+💡 **Nouveautés:**
+• Système de notation A-F
+• Catégories et difficultés
+• Explications détaillées
+• Annulation à tout moment
+
+🚀 Prêt à défier vos amis?`);
 
     } catch (error) {
         console.error('❌ Erreur Quiz:', error.message);
-        await message.reply('❌ Erreur lors du traitement du quiz');
+        await message.reply('❌ Erreur lors du traitement du quiz. Réessayez dans quelques instants.');
     }
 }
 
-// Gestionnaire des conversations pour créer un quiz
+// Gestionnaire des conversations pour créer un quiz (amélioré)
 async function handleQuizCreation(client, message, userState) {
     const userId = message.author || message.from;
     const text = message.body.trim();
+    const contact = await message.getContact();
+    const userName = contact.pushname || 'Utilisateur';
+    
+    // Vérifier si l'utilisateur veut annuler
+    if (text.toLowerCase() === 'annuler' || text.toLowerCase() === 'cancel' || text.toLowerCase() === 'stop') {
+        state.users.delete(userId);
+        return message.reply(`🚫 **Création Annulée**
+
+❌ La création de votre quiz a été annulée.
+🔄 Vous pouvez recommencer avec /quiz créer
+
+👋 À bientôt ${userName}!`);
+    }
     
     try {
         switch (userState.step) {
             case 'title':
-                userState.quiz.title = text;
-                userState.step = 'question_count';
-                return message.reply(`✅ Titre: "${text}"
+                if (text.length < 5) {
+                    return message.reply(`❌ **Titre trop court!**
 
-Étape 2/4: Combien de questions voulez-vous? (1-10)`);
+📝 Le titre doit contenir au moins 5 caractères.
+
+💡 **Exemples valides:**
+• "Quiz de Culture Générale"
+• "Connais-tu les animaux?"
+• "Test de Personnalité"
+
+⚠️ Tapez "annuler" pour arrêter`);
+                }
+                
+                userState.quiz.title = text;
+                userState.step = 'category';
+                return message.reply(`✅ **Titre:** "${text}"
+
+📂 **Étape 2/6: Catégorie**
+Choisissez une catégorie pour votre quiz:
+
+1️⃣ Culture Générale
+2️⃣ Sciences
+3️⃣ Histoire
+4️⃣ Sport
+5️⃣ Divertissement
+6️⃣ Personnalité
+7️⃣ Géographie
+8️⃣ Autre
+
+💡 Tapez le numéro ou le nom de la catégorie
+⚠️ Tapez "annuler" pour arrêter`);
+
+            case 'category':
+                const categories = {
+                    '1': 'Culture Générale', '2': 'Sciences', '3': 'Histoire', '4': 'Sport',
+                    '5': 'Divertissement', '6': 'Personnalité', '7': 'Géographie', '8': 'Autre',
+                    'culture générale': 'Culture Générale', 'culture': 'Culture Générale',
+                    'sciences': 'Sciences', 'science': 'Sciences',
+                    'histoire': 'Histoire', 'sport': 'Sport', 'sports': 'Sport',
+                    'divertissement': 'Divertissement', 'entertainment': 'Divertissement',
+                    'personnalité': 'Personnalité', 'personalité': 'Personnalité',
+                    'géographie': 'Géographie', 'geographie': 'Géographie',
+                    'autre': 'Autre', 'autres': 'Autre'
+                };
+                
+                const selectedCategory = categories[text.toLowerCase()] || 'Autre';
+                userState.quiz.category = selectedCategory;
+                userState.step = 'difficulty';
+                
+                return message.reply(`✅ **Catégorie:** ${selectedCategory}
+
+⭐ **Étape 3/6: Difficulté**
+Choisissez le niveau de difficulté:
+
+🟢 **1. Facile** - Questions simples pour tous
+🟡 **2. Normale** - Niveau modéré
+🔴 **3. Difficile** - Pour les experts
+🟣 **4. Expert** - Défi ultime!
+
+💡 Tapez le numéro ou le nom de la difficulté
+⚠️ Tapez "annuler" pour arrêter`);
+
+            case 'difficulty':
+                const difficulties = {
+                    '1': 'Facile', '2': 'Normale', '3': 'Difficile', '4': 'Expert',
+                    'facile': 'Facile', 'easy': 'Facile',
+                    'normale': 'Normale', 'normal': 'Normale', 'moyen': 'Normale',
+                    'difficile': 'Difficile', 'hard': 'Difficile', 'dur': 'Difficile',
+                    'expert': 'Expert', 'très difficile': 'Expert', 'extrême': 'Expert'
+                };
+                
+                const selectedDifficulty = difficulties[text.toLowerCase()] || 'Normale';
+                userState.quiz.difficulty = selectedDifficulty;
+                userState.step = 'question_count';
+                
+                return message.reply(`✅ **Difficulté:** ${selectedDifficulty}
+
+🔢 **Étape 4/6: Nombre de Questions**
+Combien de questions voulez-vous? (1-15)
+
+💡 **Recommandations:**
+• 3-5 questions: Quiz rapide
+• 6-10 questions: Quiz standard  
+• 11-15 questions: Quiz complet
+
+⚠️ Tapez "annuler" pour arrêter`);
 
             case 'question_count':
                 const count = parseInt(text);
-                if (isNaN(count) || count < 1 || count > 10) {
-                    return message.reply('❌ Veuillez entrer un nombre entre 1 et 10');
+                if (isNaN(count) || count < 1 || count > 15) {
+                    return message.reply(`❌ **Nombre invalide!**
+
+🔢 Veuillez entrer un nombre entre 1 et 15.
+
+💡 **Exemple:** 5
+
+⚠️ Tapez "annuler" pour arrêter`);
                 }
+                
                 userState.quiz.questionCount = count;
                 userState.quiz.currentQuestion = 1;
                 userState.step = 'questions';
-                return message.reply(`✅ ${count} question(s)
+                
+                return message.reply(`✅ **${count} question(s)** programmées
 
-Étape 3/4: Question 1/${count}
-Écrivez votre question:`);
+📝 **Étape 5/6: Questions**
+**Question 1/${count}**
+
+Écrivez votre première question:
+
+💡 **Conseil:** Soyez clair et précis!
+⚠️ Tapez "annuler" pour arrêter`);
 
             case 'questions':
-                const { quiz, currentQuestion } = userState.quiz;
+                const { quiz } = userState;
                 const questionIndex = userState.quiz.currentQuestion - 1;
                 
                 if (!userState.quiz.questions[questionIndex]) {
                     // Nouvelle question
-                    userState.quiz.questions[questionIndex] = { question: text, options: [], correct: null };
+                    if (text.length < 10) {
+                        return message.reply(`❌ **Question trop courte!**
+
+📝 La question doit contenir au moins 10 caractères.
+
+💡 **Exemple:** "Quelle est la capitale de la France?"
+
+⚠️ Tapez "annuler" pour arrêter`);
+                    }
+                    
+                    userState.quiz.questions[questionIndex] = { 
+                        question: text, 
+                        options: [], 
+                        correct: null,
+                        explanation: null
+                    };
                     userState.quiz.waitingFor = 'options';
-                    return message.reply(`✅ Question: "${text}"
+                    
+                    return message.reply(`✅ **Question:** "${text}"
 
-Maintenant, donnez les options de réponse (une par ligne):
-a) Option A
-b) Option B
-c) Option C
-d) Option D
+📋 **Options de Réponse**
+Donnez 2 à 4 options (une par ligne):
 
-Puis tapez "fini" quand terminé`);
+**Format recommandé:**
+a) Première option
+b) Deuxième option  
+c) Troisième option
+d) Quatrième option
+
+Puis tapez **"fini"** quand terminé
+
+⚠️ Tapez "annuler" pour arrêter`);
+                    
                 } else if (userState.quiz.waitingFor === 'options') {
-                    if (text.toLowerCase() === 'fini') {
-                        userState.quiz.waitingFor = 'correct';
-                        return message.reply(`✅ Options enregistrées!
+                    if (text.toLowerCase() === 'fini' || text.toLowerCase() === 'terminé') {
+                        if (userState.quiz.questions[questionIndex].options.length < 2) {
+                            return message.reply(`❌ **Pas assez d'options!**
 
+📋 Il faut au moins 2 options de réponse.
+
+💡 Ajoutez encore une option puis tapez "fini"
+
+⚠️ Tapez "annuler" pour arrêter`);
+                        }
+                        
+                        userState.quiz.waitingFor = 'correct';
+                        const options = userState.quiz.questions[questionIndex].options;
+                        let optionsList = '';
+                        options.forEach((opt, i) => {
+                            optionsList += `${String.fromCharCode(97 + i)}) ${opt}\n`;
+                        });
+                        
+                        return message.reply(`✅ **Options enregistrées!**
+
+${optionsList}
+
+🎯 **Bonne Réponse**
 Quelle est la bonne réponse? (a, b, c, ou d)
-Ou tapez "skip" pour passer sans réponse correcte:`);
+
+💡 Ou tapez "skip" pour passer (pas de bonne réponse)
+⚠️ Tapez "annuler" pour arrêter`);
                     }
                     
                     // Ajouter option
-                    const option = text.replace(/^[a-d]\)\s*/i, '');
-                    userState.quiz.questions[questionIndex].options.push(option);
-                    return message.reply(`✅ Option ajoutée. Continuez ou tapez "fini"`);
+                    const cleanOption = text.replace(/^[a-d]\)\s*/i, '').trim();
+                    if (cleanOption.length < 2) {
+                        return message.reply(`❌ **Option trop courte!**
+
+📝 L'option doit contenir au moins 2 caractères.
+
+⚠️ Tapez "annuler" pour arrêter`);
+                    }
+                    
+                    userState.quiz.questions[questionIndex].options.push(cleanOption);
+                    const optionCount = userState.quiz.questions[questionIndex].options.length;
+                    
+                    return message.reply(`✅ **Option ${optionCount} ajoutée!**
+
+💡 Ajoutez une autre option ou tapez "fini"
+⚠️ Tapez "annuler" pour arrêter`);
                     
                 } else if (userState.quiz.waitingFor === 'correct') {
+                    let correctAnswer = null;
+                    
                     if (text.toLowerCase() !== 'skip') {
-                        const correct = text.toLowerCase().match(/[a-d]/);
-                        if (correct) {
-                            userState.quiz.questions[questionIndex].correct = correct[0];
+                        const match = text.toLowerCase().match(/[a-d]/);
+                        if (match) {
+                            const letterIndex = match[0].charCodeAt(0) - 97;
+                            if (letterIndex < userState.quiz.questions[questionIndex].options.length) {
+                                correctAnswer = match[0];
+                            } else {
+                                return message.reply(`❌ **Lettre invalide!**
+
+🎯 Choisissez parmi les options disponibles (a-${String.fromCharCode(96 + userState.quiz.questions[questionIndex].options.length)})
+
+⚠️ Tapez "annuler" pour arrêter`);
+                            }
                         }
+                    }
+                    
+                    userState.quiz.questions[questionIndex].correct = correctAnswer;
+                    userState.quiz.waitingFor = 'explanation';
+                    
+                    return message.reply(`✅ **Réponse ${correctAnswer ? correctAnswer.toUpperCase() : 'non définie'}**
+
+💡 **Explication (Optionnel)**
+Voulez-vous ajouter une explication pour cette question?
+
+📝 Tapez votre explication ou "skip" pour passer
+⚠️ Tapez "annuler" pour arrêter`);
+                    
+                } else if (userState.quiz.waitingFor === 'explanation') {
+                    if (text.toLowerCase() !== 'skip') {
+                        userState.quiz.questions[questionIndex].explanation = text;
                     }
                     
                     // Passer à la question suivante ou terminer
                     userState.quiz.currentQuestion++;
                     if (userState.quiz.currentQuestion <= userState.quiz.questionCount) {
                         userState.quiz.waitingFor = null;
-                        return message.reply(`✅ Question ${questionIndex + 1} terminée!
+                        return message.reply(`✅ **Question ${questionIndex + 1} terminée!**
 
-Question ${userState.quiz.currentQuestion}/${userState.quiz.questionCount}:
-Écrivez votre question:`);
+📝 **Question ${userState.quiz.currentQuestion}/${userState.quiz.questionCount}**
+
+Écrivez votre prochaine question:
+
+⚠️ Tapez "annuler" pour arrêter`);
                     } else {
                         // Quiz terminé
                         userState.step = 'finished';
@@ -409,20 +897,30 @@ Question ${userState.quiz.currentQuestion}/${userState.quiz.questionCount}:
                         state.quizzes.set(quizId, userState.quiz);
                         
                         // Générer le texte du quiz
-                        let quizText = `🧠 *${userState.quiz.title}*\n`;
-                        quizText += `📝 ID: ${quizId}\n\n`;
+                        let quizText = `🧠 **${userState.quiz.title}**\n`;
+                        quizText += `🆔 **ID:** ${quizId}\n`;
+                        quizText += `👤 **Créateur:** ${userState.quiz.creator}\n`;
+                        quizText += `📂 **Catégorie:** ${userState.quiz.category}\n`;
+                        quizText += `⭐ **Difficulté:** ${userState.quiz.difficulty}\n`;
+                        quizText += `📅 **Créé:** ${userState.quiz.createdAt.toLocaleString()}\n\n`;
                         
                         userState.quiz.questions.forEach((q, index) => {
-                            quizText += `${index + 1}. ${q.question}\n`;
+                            quizText += `**${index + 1}.** ${q.question}\n`;
                             q.options.forEach((opt, i) => {
-                                quizText += `   ${String.fromCharCode(97 + i)}) ${opt}\n`;
+                                const letter = String.fromCharCode(97 + i);
+                                const marker = q.correct === letter ? '✅' : '  ';
+                                quizText += `   ${letter}) ${opt} ${marker}\n`;
                             });
+                            if (q.explanation) {
+                                quizText += `   💡 *${q.explanation}*\n`;
+                            }
                             quizText += '\n';
                         });
                         
-                        quizText += `🎯 *Comment répondre:*\n`;
+                        quizText += `🎯 **Comment répondre:**\n`;
                         quizText += `/quiz répondre ${quizId} 1a 2b 3c...\n\n`;
-                        quizText += `⏰ Quiz actif pendant 24h`;
+                        quizText += `⏰ **Quiz actif pendant 24h**\n`;
+                        quizText += `🎮 **Partagez ce quiz avec vos amis!**`;
                         
                         // Nettoyer l'état utilisateur
                         state.users.delete(userId);
@@ -430,9 +928,24 @@ Question ${userState.quiz.currentQuestion}/${userState.quiz.questionCount}:
                         // Programmer la suppression du quiz après 24h
                         setTimeout(() => {
                             state.quizzes.delete(quizId);
+                            console.log(`🗑️ Quiz ${quizId} supprimé (24h expirées)`);
                         }, 24 * 60 * 60 * 1000);
                         
-                        return message.reply(`🎉 *Quiz créé avec succès!*\n\n${quizText}`);
+                        await message.reply(`🎉 **Quiz Créé avec Succès!**
+
+🏆 Félicitations ${userName}! Votre quiz est maintenant en ligne!
+
+${quizText}`);
+                        
+                        // Envoyer également un message de partage
+                        return message.reply(`📢 **Partagez votre Quiz!**
+
+📋 Copiez et partagez ce message:
+
+"🧠 Nouveau Quiz: **${userState.quiz.title}**
+📂 ${userState.quiz.category} | ⭐ ${userState.quiz.difficulty}
+🎯 Jouez avec: /quiz répondre ${quizId} [vos réponses]
+👤 Par ${userState.quiz.creator}"`);
                     }
                 }
                 break;
@@ -440,10 +953,14 @@ Question ${userState.quiz.currentQuestion}/${userState.quiz.questionCount}:
     } catch (error) {
         console.error('❌ Erreur création quiz:', error.message);
         state.users.delete(userId);
-        return message.reply('❌ Erreur lors de la création du quiz. Réessayez avec /quiz créer');
+        return message.reply(`❌ **Erreur Inattendue**
+
+🔧 Une erreur s'est produite lors de la création.
+🔄 Réessayez avec /quiz créer
+
+💡 Si le problème persiste, contactez l'administrateur.`);
     }
 }
-
 // === GESTIONNAIRE PRINCIPAL DES MESSAGES ===
 async function handleMessage(message) {
     if (!state.ready || message.fromMe) return;
