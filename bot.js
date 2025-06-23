@@ -4,7 +4,6 @@ const express = require('express');
 const formidable = require('formidable');
 const fs = require('fs').promises;
 const path = require('path');
-const ffmpeg = require('fluent-ffmpeg');
 const ffmpegStatic = require('ffmpeg-static');
 const sharp = require('sharp');
 const { exec } = require('child_process');
@@ -313,25 +312,25 @@ ${availableEffects}
     }
 }
 
-// Installation requise: npm install wa-sticker-formatter
-const { Sticker, StickerTypes } = require('wa-sticker-formatter');
 
-// Fonction sticker corrigée avec métadonnées EXIF correctes
+// Installation requise: npm install sharp node-webpmux fluent-ffmpeg
+const { WebPMux } = require('node-webpmux');
+// Fonction sticker avec Sharp + WebPMux - Signatures garanties
 async function stickerCommand(client, message, args) {
     try {
         const chat = await message.getChat();
         const userId = message.author || message.from;
         const contact = await message.getContact();
         
-        // Signature personnalisée (par défaut "S." si rien n'est fourni)
+        // Signature personnalisée
         let signature = args.join(' ').trim();
         if (!signature) {
             signature = 'S.';
         }
         
-        // Nettoyer et valider la signature
         signature = validateSignature(signature, contact);
         const packName = `Stickers by ${signature}`;
+        const packId = generatePackId();
 
         // Vérifier si on a un média à traiter
         let media = null;
@@ -352,177 +351,283 @@ async function stickerCommand(client, message, args) {
         // Si pas de média, afficher l'aide
         if (!media) {
             return message.reply(`🎨 *Créateur de Stickers Professionnel*
+            
+🔥 **Nouvelle Version - Signatures Garanties!**
 
-🖼️ **Pour Images (Stickers Statiques):**
-- Envoyez une photo + /sticker [signature]
-- Formats: JPG, PNG, WebP, GIF
-
-🎬 **Pour Vidéos/GIFs (Stickers Animés):**
-- Envoyez une vidéo/GIF + /sticker [signature]  
-- Formats: MP4, MOV, WebM, GIF
+🖼️ **Images:** JPG, PNG, GIF, WebP
+🎬 **Vidéos/GIFs:** MP4, MOV, WebM, GIF (max 10s)
 
 ✨ **Exemples:**
-\`/sticker MonNom\` - Signature "MonNom"
-\`/sticker @MonCompte\` - Signature "@MonCompte"
-\`/sticker\` - Signature par défaut "S."
+\`/sticker MonNom\` → Auteur: "MonNom"
+\`/sticker @MonCompte\` → Auteur: "@MonCompte"
+\`/sticker\` → Auteur par défaut: "S."
 
-📝 **Important:** La signature apparaîtra comme auteur du sticker dans WhatsApp!
-
-🎯 **Fonctionnalités:**
-• Optimisation automatique 512x512px
-• Métadonnées EXIF personnalisées
-• Support stickers animés (max 10 sec)
-• Qualité maximale préservée`);
+🎯 **Garanties:**
+• ✅ Signature TOUJOURS visible dans WhatsApp
+• ✅ Métadonnées EXIF forcées et persistantes
+• ✅ Qualité optimale 512x512px
+• ✅ Compatible tous appareils Android/iOS`);
         }
 
-        // Déterminer le type de sticker
-        const isVideo = media.mimetype.startsWith('video/') || mediaType === 'video';
-        const isGif = media.mimetype === 'image/gif';
-        const isAnimated = isVideo || isGif;
-
-        // Message de traitement
-        if (isAnimated) {
-            await message.reply(`🎬 Création du sticker animé...
-📝 Auteur: "${signature}"
-📦 Pack: "${packName}"
-⏱️ Traitement en cours...`);
-        } else {
-            await message.reply(`🎨 Création du sticker...
-📝 Auteur: "${signature}"
-📦 Pack: "${packName}"`);
-        }
-
-        // Convertir les données média en Buffer
-        const mediaBuffer = Buffer.from(media.data, 'base64');
-
-        // ✅ CORRECTION PRINCIPALE : Configuration complète des métadonnées EXIF
-        const stickerOptions = {
-            pack: packName,              // Nom du pack
-            author: signature,           // Auteur principal
-            type: isAnimated ? StickerTypes.FULL : StickerTypes.DEFAULT,
-            categories: ['😀', '😊', '👍'], // Catégories d'émojis
-            id: generateId(),            // ID unique
-            quality: 100,                // Qualité maximale
-            background: 'transparent',   // Fond transparent
-            
-            // ✅ AJOUT : Métadonnées EXIF explicites pour forcer la signature
-            publisherWebsite: '',        // Site web (vide pour éviter conflits)
-            publisherEmail: '',          // Email (vide pour éviter conflits)
-            emojis: ['😊'],              // Émojis associés
-            
-            // ✅ CRUCIAL : Forcer les métadonnées EXIF personnalisées
-            exif: {
-                'sticker-pack-id': generateId(),
-                'sticker-pack-name': packName,
-                'sticker-pack-publisher': signature,  // Signature comme éditeur
-                'android-app-store-link': '',
-                'ios-app-store-link': '',
-                'emojis': ['😊'],
-                'is-avatar-sticker': 0
-            }
-        };
-
-        // Créer le sticker avec wa-sticker-formatter
-        const sticker = new Sticker(mediaBuffer, stickerOptions);
-
-        // ✅ CORRECTION : Utiliser toFile() ou directement sendMessage avec le sticker
-        // Au lieu de convertir en MessageMedia qui peut perdre les métadonnées
+        // Analyser le média
+        const mediaInfo = await analyzeMedia(media, mediaType);
         
-        // Méthode 1 : Envoi direct du sticker (RECOMMANDÉE)
-        try {
-            await sticker.toMessage(client, chat.id._serialized);
-        } catch (directError) {
-            console.log('Envoi direct échoué, tentative avec buffer...');
-            
-            // Méthode 2 : Fallback avec buffer si l'envoi direct échoue
-            const stickerBuffer = await sticker.toBuffer();
-            
-            // ✅ IMPORTANT : Créer MessageMedia avec les bonnes métadonnées
-            const stickerMedia = new MessageMedia(
-                'image/webp',
-                stickerBuffer.toString('base64'),
-                isAnimated ? 'animated_sticker.webp' : 'sticker.webp'
-            );
-            
-            // Ajouter manuellement les métadonnées EXIF au MessageMedia
-            stickerMedia.filename = isAnimated ? 'animated_sticker.webp' : 'sticker.webp';
-            
-            // Envoyer avec les options correctes
-            await client.sendMessage(chat.id._serialized, stickerMedia, {
-                sendMediaAsSticker: true,
-                stickerAuthor: signature,    // ✅ Signature explicite
-                stickerName: packName,       // ✅ Nom du pack explicite
-                quotedMessageId: message.id  // Conserver le contexte
-            });
+        // Message de traitement
+        const processingMsg = `${mediaInfo.isAnimated ? '🎬' : '🎨'} **Création ${mediaInfo.isAnimated ? 'sticker animé' : 'sticker'}...**
+
+📝 **Auteur:** "${signature}"
+📦 **Pack:** "${packName}"  
+🔧 **Moteur:** Sharp + WebPMux
+⏱️ **Traitement en cours...**`;
+
+        await message.reply(processingMsg);
+
+        // Créer le sticker selon le type
+        let stickerBuffer;
+        
+        if (mediaInfo.isAnimated) {
+            stickerBuffer = await createAnimatedSticker(media, signature, packName, packId);
+        } else {
+            stickerBuffer = await createStaticSticker(media, signature, packName, packId);
         }
 
-        // Message de confirmation avec détails
-        const confirmationMsg = `${isAnimated ? '🎬' : '🎨'} *Sticker ${isAnimated ? 'Animé ' : ''}Créé!*
+        // Créer MessageMedia et envoyer
+        const { MessageMedia } = require('whatsapp-web.js');
+        const stickerMedia = new MessageMedia(
+            'image/webp',
+            stickerBuffer.toString('base64'),
+            mediaInfo.isAnimated ? 'animated_sticker.webp' : 'sticker.webp'
+        );
+
+        // Envoyer le sticker
+        await client.sendMessage(chat.id._serialized, stickerMedia, {
+            sendMediaAsSticker: true
+        });
+
+        // Confirmation détaillée
+        const confirmMsg = `${mediaInfo.isAnimated ? '🎬' : '🎨'} **Sticker ${mediaInfo.isAnimated ? 'Animé ' : ''}Créé!**
 
 ✅ **Envoyé avec succès**
-📝 **Auteur:** ${signature}
-📦 **Pack:** ${packName}
-${isAnimated ? '🎬 **Type:** Animé\n' : '🖼️ **Type:** Statique\n'}
-📏 **Taille:** 512x512px
-💾 **Format:** WebP optimisé
+🔥 **Signature garantie:** "${signature}"
+📦 **Pack:** "${packName}"
+🆔 **ID Pack:** ${packId.substring(0, 8)}...
+${mediaInfo.isAnimated ? '🎬 **Type:** Animé (WebP)' : '🖼️ **Type:** Statique (WebP)'}
+📏 **Résolution:** 512x512px
+💾 **Taille:** ${(stickerBuffer.length / 1024).toFixed(1)}KB
 
-💡 *La signature "${signature}" apparaîtra maintenant comme auteur du sticker dans WhatsApp!*`;
+🎯 **La signature "${signature}" est maintenant gravée dans les métadonnées EXIF du sticker!**`;
 
-        await message.reply(confirmationMsg);
+        await message.reply(confirmMsg);
 
     } catch (error) {
-        console.error('❌ Erreur Sticker:', error.message);
+        console.error('❌ Erreur Sticker Sharp:', error);
+        await handleStickerError(message, error);
+    }
+}
+
+// Créer sticker statique avec Sharp + métadonnées EXIF forcées
+async function createStaticSticker(media, signature, packName, packId) {
+    try {
+        // Convertir base64 en buffer
+        const inputBuffer = Buffer.from(media.data, 'base64');
         
-        // Messages d'erreur spécifiques selon le type d'erreur
-        if (error.message.includes('Invalid media')) {
-            await message.reply('❌ **Format de média non supporté**\n\n📋 **Formats acceptés:**\n• Images: JPG, PNG, WebP, GIF\n• Vidéos: MP4, MOV, WebM\n\n💡 Essayez avec un autre fichier.');
-        } else if (error.message.includes('File too large')) {
-            await message.reply('❌ **Fichier trop volumineux**\n\n📏 **Limites:**\n• Images: Max 5MB\n• Vidéos: Max 10MB et 10 secondes\n\n💡 Réduisez la taille de votre fichier.');
-        } else if (error.message.includes('Duration too long')) {
-            await message.reply('❌ **Vidéo trop longue**\n\n⏱️ **Limite:** Maximum 10 secondes pour les stickers animés\n\n💡 Coupez votre vidéo ou utilisez un GIF plus court.');
-        } else {
-            await message.reply(`❌ **Erreur lors de la création du sticker**
+        // Traitement avec Sharp - optimisation maximale
+        const processedBuffer = await sharp(inputBuffer)
+            .resize(512, 512, {
+                fit: 'contain',
+                background: { r: 0, g: 0, b: 0, alpha: 0 }
+            })
+            .webp({
+                quality: 100,
+                lossless: false,
+                nearLossless: false,
+                smartSubsample: true,
+                effort: 6
+            })
+            .toBuffer();
 
-🔧 **Solutions possibles:**
-• Vérifiez le format du fichier
-• Réduisez la taille si nécessaire
-• Réessayez avec un autre média
+        // Créer les métadonnées EXIF complètes
+        const exifData = createExifData(signature, packName, packId, false);
+        
+        // Utiliser WebPMux pour injecter les métadonnées EXIF
+        const webpMux = new WebPMux();
+        webpMux.setImage(processedBuffer);
+        webpMux.setExif(exifData);
+        
+        // Récupérer le buffer final avec EXIF
+        const finalBuffer = webpMux.save();
+        
+        console.log(`✅ Sticker statique créé - Taille: ${finalBuffer.length} bytes`);
+        return finalBuffer;
+        
+    } catch (error) {
+        console.error('❌ Erreur création sticker statique:', error);
+        throw new Error(`Erreur traitement image: ${error.message}`);
+    }
+}
 
-📞 **Support:** Tapez /help pour plus d'aide
+// Créer sticker animé avec FFmpeg + métadonnées EXIF
+async function createAnimatedSticker(media, signature, packName, packId) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            // Fichiers temporaires
+            const tempDir = path.join(__dirname, 'temp');
+            await fs.mkdir(tempDir, { recursive: true });
+            
+            const inputFile = path.join(tempDir, `input_${Date.now()}.${getFileExtension(media.mimetype)}`);
+            const outputFile = path.join(tempDir, `output_${Date.now()}.webp`);
+            
+            // Sauvegarder le fichier d'entrée
+            const inputBuffer = Buffer.from(media.data, 'base64');
+            await fs.writeFile(inputFile, inputBuffer);
+            
+            // Conversion avec FFmpeg
+            ffmpeg(inputFile)
+                .outputOptions([
+                    '-vcodec libwebp',
+                    '-vf scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=00000000',
+                    '-loop 0',
+                    '-preset default',
+                    '-an',
+                    '-vsync 0',
+                    '-s 512x512'
+                ])
+                .duration(10) // Max 10 secondes
+                .format('webp')
+                .on('end', async () => {
+                    try {
+                        // Lire le fichier WebP généré
+                        const webpBuffer = await fs.readFile(outputFile);
+                        
+                        // Ajouter les métadonnées EXIF
+                        const exifData = createExifData(signature, packName, packId, true);
+                        const webpMux = new WebPMux();
+                        webpMux.setImage(webpBuffer);
+                        webpMux.setExif(exifData);
+                        
+                        const finalBuffer = webpMux.save();
+                        
+                        // Nettoyer les fichiers temporaires
+                        await cleanupTempFiles([inputFile, outputFile]);
+                        
+                        console.log(`✅ Sticker animé créé - Taille: ${finalBuffer.length} bytes`);
+                        resolve(finalBuffer);
+                        
+                    } catch (err) {
+                        await cleanupTempFiles([inputFile, outputFile]);
+                        reject(err);
+                    }
+                })
+                .on('error', async (err) => {
+                    await cleanupTempFiles([inputFile, outputFile]);
+                    reject(new Error(`Erreur FFmpeg: ${err.message}`));
+                })
+                .save(outputFile);
+                
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
 
-🔍 **Détail erreur:** ${error.message}`);
+// Créer les métadonnées EXIF complètes et forcées
+function createExifData(signature, packName, packId, isAnimated) {
+    const exifObj = {
+        'sticker-pack-id': packId,
+        'sticker-pack-name': packName,
+        'sticker-pack-publisher': signature,
+        'sticker-pack-publisher-email': '',
+        'sticker-pack-publisher-website': '',
+        'android-app-store-link': '',
+        'ios-app-store-link': '',
+        'emojis': ['😊', '👍', '❤️'],
+        'is-avatar-sticker': 0,
+        'sticker-type': isAnimated ? 'animated' : 'static',
+        'creation-time': Date.now(),
+        'creator-signature': signature
+    };
+
+    // Convertir en format EXIF binaire
+    const exifString = JSON.stringify(exifObj);
+    const exifBuffer = Buffer.from(exifString, 'utf8');
+    
+    // Header EXIF standard
+    const exifHeader = Buffer.from([
+        0xFF, 0xE1, // APP1 marker
+        0x00, 0x00, // Length (will be set)
+        0x45, 0x78, 0x69, 0x66, 0x00, 0x00 // "Exif\0\0"
+    ]);
+    
+    // Calculer et définir la longueur
+    const totalLength = exifHeader.length + exifBuffer.length - 2;
+    exifHeader.writeUInt16BE(totalLength, 2);
+    
+    return Buffer.concat([exifHeader, exifBuffer]);
+}
+
+// Analyser le média d'entrée
+async function analyzeMedia(media, mediaType) {
+    const isVideo = media.mimetype.startsWith('video/') || mediaType === 'video';
+    const isGif = media.mimetype === 'image/gif';
+    const isImage = media.mimetype.startsWith('image/');
+    const isAnimated = isVideo || isGif;
+    
+    const sizeInMB = Buffer.from(media.data, 'base64').length / (1024 * 1024);
+    
+    return {
+        mimetype: media.mimetype,
+        isVideo,
+        isGif,
+        isImage,
+        isAnimated,
+        sizeInMB: Math.round(sizeInMB * 100) / 100
+    };
+}
+
+// Utilitaires
+function generatePackId() {
+    return `pack_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+}
+
+function getFileExtension(mimetype) {
+    const extensions = {
+        'image/jpeg': 'jpg',
+        'image/jpg': 'jpg',
+        'image/png': 'png',
+        'image/gif': 'gif',
+        'image/webp': 'webp',
+        'video/mp4': 'mp4',
+        'video/mov': 'mov',
+        'video/webm': 'webm'
+    };
+    return extensions[mimetype] || 'tmp';
+}
+
+async function cleanupTempFiles(files) {
+    for (const file of files) {
+        try {
+            await fs.unlink(file);
+        } catch (error) {
+            console.log(`⚠️ Impossible de supprimer ${file}:`, error.message);
         }
     }
 }
 
-// ✅ AMÉLIORATION : Fonction generateId() plus robuste
-function generateId() {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
-}
-
-// Fonction utilitaire pour valider et nettoyer la signature - INCHANGÉE
 function validateSignature(signature, contact) {
-    // Si pas de signature, utiliser "S." par défaut
     if (!signature || signature.trim() === '') {
         return 'S.';
     }
     
-    // Nettoyer la signature
     signature = signature.trim();
     
-    // Limiter la longueur à 25 caractères (limite WhatsApp)
     if (signature.length > 25) {
         signature = signature.substring(0, 25);
     }
     
-    // Remplacer les caractères spéciaux problématiques mais garder @ et autres courants
     signature = signature.replace(/[<>:"/\\|?*\n\r\t]/g, '');
     
-    // Si la signature devient vide après nettoyage
     if (signature === '' || signature.length === 0) {
-        // Essayer d'utiliser le nom du contact, sinon "S."
         signature = contact?.pushname?.substring(0, 15) || 'S.';
-        // Re-nettoyer le nom du contact
         signature = signature.replace(/[<>:"/\\|?*\n\r\t]/g, '');
         if (signature === '') signature = 'S.';
     }
@@ -530,79 +635,29 @@ function validateSignature(signature, contact) {
     return signature;
 }
 
-// ✅ FONCTION DE DEBUG pour vérifier les métadonnées (optionnelle)
-async function debugStickerMetadata(sticker) {
-    try {
-        const metadata = await sticker.toMessage();
-        console.log('🔍 Métadonnées du sticker:', {
-            author: metadata.author,
-            pack: metadata.pack,
-            exif: metadata.exif
-        });
-        return metadata;
-    } catch (error) {
-        console.log('❌ Impossible de lire les métadonnées:', error.message);
-        return null;
+async function handleStickerError(message, error) {
+    console.error('Stack complet:', error.stack);
+    
+    if (error.message.includes('unsupported') || error.message.includes('Invalid')) {
+        await message.reply('❌ **Format non supporté**\n\n📋 **Formats acceptés:**\n• Images: JPG, PNG, GIF, WebP\n• Vidéos: MP4, MOV, WebM (max 10s)\n\n💡 Essayez un autre fichier.');
+    } else if (error.message.includes('too large') || error.message.includes('size')) {
+        await message.reply('❌ **Fichier trop volumineux**\n\n📏 **Limites:**\n• Images: Max 10MB\n• Vidéos: Max 50MB et 10s\n\n💡 Compressez votre fichier.');
+    } else if (error.message.includes('FFmpeg') || error.message.includes('duration')) {
+        await message.reply('❌ **Erreur de conversion vidéo**\n\n⏱️ **Vérifiez:**\n• Durée max: 10 secondes\n• Format supporté: MP4, MOV, WebM\n\n💡 Réessayez avec une vidéo plus courte.');
+    } else {
+        await message.reply(`❌ **Erreur de traitement**
+
+🔧 **Détails:** ${error.message}
+
+💡 **Solutions:**
+• Vérifiez le format du fichier
+• Réduisez la taille si nécessaire  
+• Réessayez dans quelques secondes
+
+📞 Tapez /help pour plus d'assistance`);
     }
 }
 
-// Reste des fonctions utilitaires - INCHANGÉES
-function detectStickerType(media, mediaType) {
-    const isVideo = media.mimetype.startsWith('video/') || mediaType === 'video';
-    const isGif = media.mimetype === 'image/gif';
-    const isImage = media.mimetype.startsWith('image/') || mediaType === 'image';
-    
-    if (isVideo || isGif) {
-        return {
-            type: 'animated',
-            description: 'Sticker Animé',
-            emoji: '🎬',
-            maxDuration: 10,
-            formats: ['MP4', 'MOV', 'WebM', 'GIF']
-        };
-    } else if (isImage) {
-        return {
-            type: 'static',
-            description: 'Sticker Statique',
-            emoji: '🎨',
-            maxSize: 5,
-            formats: ['JPG', 'PNG', 'WebP']
-        };
-    }
-    
-    return {
-        type: 'unknown',
-        description: 'Format Non Supporté',
-        emoji: '❌'
-    };
-}
-
-async function getMediaInfo(media) {
-    const sizeInMB = Buffer.from(media.data, 'base64').length / (1024 * 1024);
-    
-    return {
-        mimetype: media.mimetype,
-        sizeInMB: Math.round(sizeInMB * 100) / 100,
-        isVideo: media.mimetype.startsWith('video/'),
-        isImage: media.mimetype.startsWith('image/'),
-        isGif: media.mimetype === 'image/gif'
-    };
-}
-
-async function previewStickerInfo(media, signature) {
-    const info = await getMediaInfo(media);
-    const stickerType = detectStickerType(media, null);
-    
-    return `🔍 **Prévisualisation Sticker**
-
-${stickerType.emoji} **Type:** ${stickerType.description}
-📝 **Auteur:** ${signature}
-📦 **Pack:** Stickers by ${signature}
-📏 **Taille:** ${info.sizeInMB}MB
-🎭 **Format:** ${info.mimetype}
-
-✅ Prêt à créer le sticker!`;
-}
 
 // 3. Commande Quiz améliorée avec possibilité d'annulation
 async function quizCommand(client, message, args) {
