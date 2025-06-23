@@ -6,8 +6,8 @@
   "scripts": {
     "start": "node bot.js",
     "dev": "nodemon bot.js",
-    "install-deps": "apt-get update && apt-get install -y espeak-ng sox",
-    "setup": "npm install && npm run install-deps"
+    "install-deps": "apt-get update && apt-get install -y espeak-ng",
+    "postinstall": "echo 'Pour activer la synthèse vocale, exécutez: sudo apt-get install espeak-ng'"
   },
   "dependencies": {
     "whatsapp-web.js": "^1.23.0",
@@ -18,73 +18,15 @@
     "ffmpeg-static": "^5.2.0",
     "sharp": "^0.32.6",
     "wa-sticker-formatter": "^4.4.4",
-    
-    // Bibliothèques REQUISES pour le code sticker fourni
-    "node-webpmux": "^3.1.0",           // OBLIGATOIRE - WebPMux pour métadonnées EXIF
-    "path": "^0.12.7",                  // Gestion des chemins de fichiers
-    "node-gtts": "^2.0.2",              // Text-to-Speech Google
-    "say": "^0.16.0",                   // Text-to-Speech alternatif
-    "node-espeak": "^1.0.0",            // Synthèse vocale espeak
-    "google-tts-api": "^2.0.2",         // API Google TTS
-    "node-wav": "^0.0.2",               // Manipulation fichiers WAV
-    "prism-media": "^1.3.5",            // Traitement audio avancé
-    "node-opus": "^0.3.3",              // Codec audio Opus
-    
-    // Quiz et jeux
-    "lodash": "^4.17.21",               // Utilitaires pour quiz
-    "moment": "^2.29.4",                // Gestion des dates
-    "axios": "^1.6.0",                  // Requêtes HTTP pour APIs
-    "cheerio": "^1.0.0-rc.12",          // Web scraping pour quiz
-    
-    // Voice FX et effets audio
-    "sox-audio": "^0.3.0",              // Effets audio Sox
-    "node-record-lpcm16": "^1.0.1",     // Enregistrement audio
-    "speaker": "^0.5.4",                // Lecture audio
-    "pitch-shift": "^1.0.0",            // Modification de pitch
-    
-    // Stickers avancés
-    "canvas": "^2.11.2",                // Création d'images
-    "gif-frames": "^1.0.1",             // Extraction frames GIF
-    "imagemin": "^8.0.1",               // Optimisation images
-    "imagemin-pngquant": "^9.0.2",      // Compression PNG
-    "imagemin-gifsicle": "^7.0.0",      // Compression GIF
-    
-    // Base de données et stockage
-    "sqlite3": "^5.1.6",                // Base de données locale
-    "lowdb": "^6.1.0",                  // Base de données JSON simple
-    
-    // Sécurité et validation
-    "joi": "^17.11.0",                  // Validation de données
-    "bcryptjs": "^2.4.3",               // Hashage sécurisé
-    "rate-limiter-flexible": "^3.0.8",  // Rate limiting
-    
-    // Logging et monitoring
-    "winston": "^3.11.0",               // Système de logs
-    "winston-daily-rotate-file": "^4.7.1", // Rotation des logs
-    
-    // Utilitaires supplémentaires REQUIS par le code
-    "fs-extra": "^11.1.1",              // fs.mkdir, fs.writeFile, fs.readFile, fs.unlink
-    "fs-extra": "^11.1.1",              // Opérations fichiers étendues
-    "mime-types": "^2.1.35",            // Détection types MIME
-    "uuid": "^9.0.1",                   // Génération d'IDs uniques
-    "crypto": "^1.0.1",                 // Fonctions cryptographiques
-    "jimp": "^0.22.10",                 // Manipulation d'images alternative
-    "node-cron": "^3.0.3",              // Tâches programmées
-    "dotenv": "^16.3.1",                // Variables d'environnement
-    "colors": "^1.4.0",                 // Couleurs console
-    "cli-progress": "^3.12.0",          // Barres de progression
-    "inquirer": "^9.2.12"               // Interface CLI interactive
+    "node-webpmux": "^3.2.0",
+    "path": "^0.12.7",
+    "fs": "^0.0.1-security"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1",
-    "eslint": "^8.54.0",                // Linting code
-    "prettier": "^3.1.0",               // Formatage code
-    "jest": "^29.7.0",                  // Tests unitaires
-    "@types/node": "^20.9.0"            // Types TypeScript pour Node
+    "nodemon": "^3.0.1"
   },
   "engines": {
-    "node": ">=16.0.0",
-    "npm": ">=8.0.0"
+    "node": ">=16.0.0"
   },
   "keywords": [
     "whatsapp",
@@ -96,16 +38,18 @@
     "tts",
     "voice-cloning",
     "nodejs",
-    "chatbot",
-    "automation",
-    "messaging"
+    "webp",
+    "exif",
+    "multimedia"
   ],
-  "author": "WhatsApp Bot Developer [Durand Dev]",
+  "author": "WhatsApp Bot Developer[Durand Dev]",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/duranddev/whatsapp-bot-modern.git"
+    "url": "https://github.com/votre-username/whatsapp-bot-modern.git"
   },
   "bugs": {
-    "url": "https://github.com/duranddev/whatsapp-bot-modern/issues"
+    "url": "https://github.com/votre-username/whatsapp-bot-modern/issues"
   },
+  "homepage": "https://github.com/votre-username/whatsapp-bot-modern#readme"
+}
